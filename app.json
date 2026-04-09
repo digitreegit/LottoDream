@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "LottoDreamUSA",
-    "slug": "LottoDreamUSA",
+    "name": "LottoDream",
+    "slug": "lottodream",
+    "scheme": "lottodream",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
