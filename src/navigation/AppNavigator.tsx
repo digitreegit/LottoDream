@@ -170,7 +170,9 @@ export function AppNavigator() {
             <AuthStackNav.Screen name="Register">
               {(props) => <RegisterScreen {...props} onBack={() => setWebAuthScreen('none')} />}
             </AuthStackNav.Screen>
-            <AuthStackNav.Screen name="RetrievePassword" component={RetrievePasswordScreen} />
+            <AuthStackNav.Screen name="RetrievePassword">
+              {(props) => <RetrievePasswordScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+            </AuthStackNav.Screen>
             <AuthStackNav.Screen name="ResetPassword">
               {(props) => <ResetPasswordScreen {...props} onResetComplete={() => setIsPasswordRecovery(false)} />}
             </AuthStackNav.Screen>
@@ -191,7 +193,9 @@ export function AppNavigator() {
             <AuthStackNav.Screen name="Register">
               {(props) => <RegisterScreen {...props} onBack={() => setWebAuthScreen('none')} />}
             </AuthStackNav.Screen>
-            <AuthStackNav.Screen name="RetrievePassword" component={RetrievePasswordScreen} />
+            <AuthStackNav.Screen name="RetrievePassword">
+              {(props) => <RetrievePasswordScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+            </AuthStackNav.Screen>
             <AuthStackNav.Screen name="ResetPassword">
               {(props) => <ResetPasswordScreen {...props} onResetComplete={() => setIsPasswordRecovery(false)} />}
             </AuthStackNav.Screen>

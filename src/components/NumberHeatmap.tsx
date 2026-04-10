@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A202C',
     marginBottom: 10,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   row: {
     flexDirection: 'row',
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#1A202C',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   selected: {
     borderWidth: 2,
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   selectedText: {
     color: '#E53E3E',
     fontWeight: '800',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   legend: {
     flexDirection: 'row',

@@ -14,6 +14,7 @@ import { LottoRow } from '../components/LottoBall';
 import { StatRow } from '../components/StatCard';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
+import { LottoDreamLogo } from '../components/LottoDreamLogo';
 
 export function HomeScreen({ navigation }: any) {
   const { game, config } = useGame();
@@ -35,7 +36,7 @@ export function HomeScreen({ navigation }: any) {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.logo}>🎱 LottoDream</Text>
+        <LottoDreamLogo width={190} />
         <Text style={styles.tagline}>{config.name} Smart Analysis</Text>
       </View>
 
@@ -213,17 +214,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 20,
   },
-  logo: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
   tagline: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#A0AEC0',
     marginTop: 4,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   card: {
     backgroundColor: '#1A2744',
@@ -232,13 +227,13 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 12,
   },
   drawDate: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#A0AEC0',
     textAlign: 'center',
     marginBottom: 12,
@@ -251,16 +246,16 @@ const styles = StyleSheet.create({
     color: '#F6AD55',
     textAlign: 'center',
     marginTop: 8,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   loadingText: {
     color: '#718096',
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 15,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#FFFFFF',
     marginTop: 16,
     marginBottom: 8,
@@ -289,8 +284,8 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
+    fontWeight: '600',
+    fontSize: 14,
   },
   ctaContainer: {
     marginVertical: 16,
@@ -305,7 +300,7 @@ const styles = StyleSheet.create({
   ctaPrimaryText: {
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   ctaSecondary: {
     backgroundColor: '#2D3748',
@@ -317,8 +312,8 @@ const styles = StyleSheet.create({
   },
   ctaSecondaryText: {
     color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
   },
   recentDraw: {
     paddingVertical: 10,

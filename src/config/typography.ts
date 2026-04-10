@@ -1,11 +1,11 @@
 // ============================================
 // Typography & Font Configuration
 // ============================================
-// Global font settings using Inter
-// Font family: Inter (https://fonts.google.com/specimen/Inter)
+// Global font settings using Rubik
+// Font family: Rubik (https://fonts.google.com/specimen/Rubik)
 
 export const FONTS = {
-  family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  family: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   weights: {
     light: '300',
     normal: '400',
@@ -24,23 +24,23 @@ export const fontFamilyStyle = {
 export const fontStyles = {
   h1: {
     fontFamily: FONTS.family,
-    fontSize: 32,
-    fontWeight: '900' as const,
+    fontSize: 30,
+    fontWeight: '800' as const,
   },
   h2: {
     fontFamily: FONTS.family,
-    fontSize: 28,
-    fontWeight: '800' as const,
+    fontSize: 27,
+    fontWeight: '700' as const,
   },
   h3: {
     fontFamily: FONTS.family,
     fontSize: 22,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
   },
   h4: {
     fontFamily: FONTS.family,
-    fontSize: 18,
-    fontWeight: '700' as const,
+    fontSize: 17,
+    fontWeight: '600' as const,
   },
   body: {
     fontFamily: FONTS.family,
@@ -60,7 +60,7 @@ export const fontStyles = {
   button: {
     fontFamily: FONTS.family,
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '500' as const,
   },
   caption: {
     fontFamily: FONTS.family,

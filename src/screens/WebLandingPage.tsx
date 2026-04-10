@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { LottoDreamLogo } from '../components/LottoDreamLogo';
 
 interface Props {
   onLogin: () => void;
@@ -47,6 +48,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
   
   const scrollViewRef = useRef<ScrollView>(null);
   const [sectionY, setSectionY] = useState({ features: 0, howItWorks: 0 });
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
 
   const scrollToSection = (sectionKey: 'features' | 'howItWorks') => {
     const yOffset = Math.max(sectionY[sectionKey] - STICKY_NAV_OFFSET, 0);
@@ -67,7 +69,9 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
     >
       {/* ── Navbar ── */}
       <View style={[styles.nav, isWide && styles.navWide]}>
-        <Text style={styles.navLogo}>🎱 LottoDream</Text>
+        <View style={styles.navLogoWrap}>
+          <LottoDreamLogo width={150} />
+        </View>
         <View style={styles.navLinks}>
           <TouchableOpacity onPress={() => scrollToSection('features')}>
             <Text style={styles.navLink}>Features</Text>
@@ -75,7 +79,11 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           <TouchableOpacity onPress={() => scrollToSection('howItWorks')}>
             <Text style={styles.navLink}>How It Works</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navLoginBtn} onPress={onLogin}>
+          <TouchableOpacity 
+            style={[styles.navLoginBtn, { backgroundColor: hoveredButton === 'navSignIn' ? 'rgba(113, 128, 150, 0.15)' : 'rgba(113, 128, 150, 0.08)' }]} 
+            {...({ onMouseEnter: () => setHoveredButton('navSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
+            onPress={onLogin}
+          >
             <Text style={styles.navLoginText}>Sign In</Text>
           </TouchableOpacity>
         </View>
@@ -85,17 +93,25 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       <View style={[styles.hero, isWide && styles.heroWide]}>
         <Text style={styles.heroEmoji}>🎯</Text>
         <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]}>
-          Smart Lottery Analysis{'\n'}Powered by Data
+          Smart Lottery Analysis{'\n'}Powered by AI
         </Text>
         <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
           Analyze Powerball & Mega Millions draw history, discover hot/cold patterns,
           and generate AI-powered number picks — all in one place.
         </Text>
         <View style={[styles.heroCtas, isWide && styles.heroCtasWide]}>
-          <TouchableOpacity style={styles.ctaPrimary} onPress={onRegister}>
+          <TouchableOpacity 
+            style={[styles.ctaPrimary, { backgroundColor: hoveredButton === 'getStarted' ? '#5BA4FF' : '#3182CE' }]}
+            onPress={onRegister}
+            {...({ onMouseEnter: () => setHoveredButton('getStarted'), onMouseLeave: () => setHoveredButton(null) } as any)}
+          >
             <Text style={styles.ctaPrimaryText}>Get Started</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.ctaOutline} onPress={onLogin}>
+          <TouchableOpacity 
+            style={[styles.ctaOutline, { backgroundColor: hoveredButton === 'signIn' ? 'rgba(71, 85, 105, 0.15)' : 'rgba(71, 85, 105, 0.08)' }]}
+            onPress={onLogin}
+            {...({ onMouseEnter: () => setHoveredButton('signIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
+          >
             <Text style={styles.ctaOutlineText}>Sign In</Text>
           </TouchableOpacity>
         </View>
@@ -197,14 +213,38 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         <Text style={styles.ctaBannerSub}>
           Sign up now to save your picks, track results, and purchase tickets — on any device.
         </Text>
-        <TouchableOpacity style={styles.ctaBannerBtn} onPress={onRegister}>
+        {/* @ts-ignore */}
+        <TouchableOpacity 
+          style={[styles.ctaBannerBtn, { backgroundColor: hoveredButton === 'ctaBanner' ? '#5BA4FF' : '#3182CE' }]}
+          onPress={onRegister}
+          {...({ onMouseEnter: () => setHoveredButton('ctaBanner'), onMouseLeave: () => setHoveredButton(null) } as any)}
+        >
           <Text style={styles.ctaBannerBtnText}>Get Started</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.storeBadgesRow, isWide && styles.storeBadgesRowWide]}>
+        {/* @ts-ignore */}
+        <TouchableOpacity 
+          style={[styles.storeBadge, { backgroundColor: hoveredButton === 'appStore' ? 'rgba(71, 85, 105, 0.12)' : 'rgba(71, 85, 105, 0.06)' }]}
+          {...({ onMouseEnter: () => setHoveredButton('appStore'), onMouseLeave: () => setHoveredButton(null) } as any)}
+        >
+          <Text style={styles.storeBadgeSub}>Download on the</Text>
+          <Text style={styles.storeBadgeTitle}>App Store</Text>
+        </TouchableOpacity>
+        {/* @ts-ignore */}
+        <TouchableOpacity 
+          style={[styles.storeBadge, { backgroundColor: hoveredButton === 'googlePlay' ? 'rgba(71, 85, 105, 0.12)' : 'rgba(71, 85, 105, 0.06)' }]}
+          {...({ onMouseEnter: () => setHoveredButton('googlePlay'), onMouseLeave: () => setHoveredButton(null) } as any)}
+        >
+          <Text style={styles.storeBadgeSub}>GET IT ON</Text>
+          <Text style={styles.storeBadgeTitle}>Google Play</Text>
         </TouchableOpacity>
       </View>
 
       {/* ── Footer ── */}
       <View style={styles.footer}>
-        <Text style={styles.footerLogo}>🎱 LottoDream</Text>
+        <LottoDreamLogo width={138} />
         <Text style={styles.footerText}>
           Data sourced from NY Open Data  •  Updated after every drawing
         </Text>
@@ -302,17 +342,18 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   navWide: { paddingHorizontal: 48 },
-  navLogo: { fontSize: 20, fontWeight: '800', color: '#FFF', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLogoWrap: { justifyContent: 'center', minHeight: 24 },
   navLinks: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  navLink: { color: '#A0AEC0', fontSize: 14, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLink: { color: '#A0AEC0', fontSize: 13, fontWeight: '400', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   navLoginBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#4A5568',
+    borderWidth: 0.5,
+    borderColor: '#718096',
+    backgroundColor: 'rgba(113, 128, 150, 0.08)',
   },
-  navLoginText: { color: '#E2E8F0', fontSize: 14, fontWeight: '600', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLoginText: { color: '#E2E8F0', fontSize: 13, fontWeight: '500', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Hero */
   hero: {
@@ -322,16 +363,16 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   heroWide: { paddingTop: 80, paddingBottom: 64 },
-  heroEmoji: { fontSize: 64, marginBottom: 16 },
+  heroEmoji: { fontSize: 104, marginBottom: 16 },
   heroTitle: {
     fontSize: 32,
-    fontWeight: '700',
+    fontWeight: '500',
     color: '#FFF',
     textAlign: 'center',
     lineHeight: 42,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  heroTitleWide: { fontSize: 48, lineHeight: 60, fontWeight: '700' },
+  heroTitleWide: { fontSize: 48, lineHeight: 60, fontWeight: '500' },
   heroSub: {
     fontSize: 16,
     color: '#A0AEC0',
@@ -339,7 +380,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     maxWidth: 560,
     lineHeight: 24,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   heroSubWide: { fontSize: 18, lineHeight: 28, maxWidth: 640 },
   heroCtas: {
@@ -356,40 +397,43 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 32,
     alignItems: 'center',
+    justifyContent: 'center',
     flex: 1,
   },
-  ctaPrimaryText: { color: '#FFF', fontSize: 18, fontWeight: '600', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaPrimaryText: { color: '#FFF', fontSize: 17, fontWeight: '500', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   ctaOutline: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#4A5568',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
     alignItems: 'center',
+    justifyContent: 'center',
     flex: 1,
+    backgroundColor: 'rgba(71, 85, 105, 0.08)',
   },
-  ctaOutlineText: { color: '#E2E8F0', fontSize: 18, fontWeight: '600', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaOutlineText: { color: '#E2E8F0', fontSize: 17, fontWeight: '500', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   /* Section */
   section: { paddingHorizontal: 24, paddingVertical: 48 },
   featuresSection: { marginBottom: 50 },
   sectionWide: { paddingHorizontal: 48, alignItems: 'center' as any },
   sectionAlt: { backgroundColor: '#111C32' },
   sectionTitle: {
-    fontSize: 28,
-    fontWeight: '600',
+    fontSize: 27,
+    fontWeight: '500',
     color: '#FFF',
     textAlign: 'center',
     marginBottom: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   sectionSub: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#A0AEC0',
     textAlign: 'center',
     marginBottom: 32,
     maxWidth: 500,
     alignSelf: 'center' as any,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 
   /* Feature Cards */
@@ -416,8 +460,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureIcon: { fontSize: FEATURE_ICON_SIZE, marginBottom: 12 },
-  featureTitle: { fontSize: 18, fontWeight: '700', color: '#FFF', marginBottom: 6, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  featureDesc: { fontSize: 14, color: '#A0AEC0', lineHeight: 21, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  featureTitle: { fontSize: 17, fontWeight: '600', color: '#FFF', marginBottom: 6, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  featureDesc: { fontSize: 13, color: '#A0AEC0', lineHeight: 20, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Steps */
   stepsRow: { gap: 16, width: '100%' },
@@ -442,16 +486,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  stepNum: { color: '#FFF', fontSize: 20, fontWeight: '800', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  stepNum: { color: '#FFF', fontSize: 18, fontWeight: '700', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   stepTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#FFF',
     marginBottom: 6,
     textAlign: 'center',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  stepDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 19, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  stepDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 19, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Games */
   gamesRow: { gap: 16, width: '100%' },
@@ -484,8 +528,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     resizeMode: 'contain',
   },
-  gameTitle: { fontSize: 22, fontWeight: '600', color: '#FFF', marginBottom: 8, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  gameDesc: { fontSize: 14, color: '#A0AEC0', textAlign: 'center', lineHeight: 22, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  gameTitle: { fontSize: 22, fontWeight: '500', color: '#FFF', marginBottom: 8, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  gameDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 21, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* CTA Banner */
   ctaBanner: {
@@ -497,21 +541,21 @@ const styles = StyleSheet.create({
   },
   ctaBannerWide: { marginHorizontal: 48, padding: 48 },
   ctaBannerTitle: {
-    fontSize: 26,
-    fontWeight: '600',
+    fontSize: 27,
+    fontWeight: '500',
     color: '#FFF',
     textAlign: 'center',
     marginBottom: 10,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  ctaBannerTitleWide: { fontSize: 32 },
+  ctaBannerTitleWide: { fontSize: 31 },
   ctaBannerSub: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#A0AEC0',
     textAlign: 'center',
     marginBottom: 24,
     maxWidth: 480,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ctaBannerBtn: {
     backgroundColor: '#3182CE',
@@ -519,7 +563,46 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 40,
   },
-  ctaBannerBtnText: { color: '#FFF', fontSize: 17, fontWeight: '700', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaBannerBtnText: { color: '#FFF', fontSize: 17, fontWeight: '600', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+
+  /* Store badges */
+  storeBadgesRow: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 24,
+    marginTop: -6,
+    marginBottom: 24,
+  },
+  storeBadgesRowWide: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  storeBadge: {
+    minWidth: 180,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: '#4A5568',
+    backgroundColor: 'rgba(71, 85, 105, 0.06)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  storeBadgeSub: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  storeBadgeTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 2,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
 
   /* Footer */
   footer: {
@@ -530,6 +613,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1A2744',
   },
-  footerLogo: { fontSize: 18, fontWeight: '700', color: '#4A5568', marginBottom: 8, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  footerText: { color: '#4A5568', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  footerText: { color: '#4A5568', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 });

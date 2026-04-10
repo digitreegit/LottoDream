@@ -243,14 +243,14 @@ const menuStyles = StyleSheet.create({
   label: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 14,
+    fontWeight: '400',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   detail: {
     color: '#718096',
-    fontSize: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 13,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });
 
@@ -276,9 +276,9 @@ const styles = StyleSheet.create({
   loginPromptTitle: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   loginPromptText: {
     color: '#A0AEC0',
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   loginButton: {
     backgroundColor: '#3182CE',
@@ -296,9 +296,9 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   profileHeader: {
     alignItems: 'center',
@@ -315,21 +315,21 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 30,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   username: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '700',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontWeight: '600',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   email: {
     color: '#A0AEC0',
     fontSize: 14,
     marginTop: 4,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pointsCard: {
     backgroundColor: '#1A2744',
@@ -343,15 +343,15 @@ const styles = StyleSheet.create({
   pointsLabel: {
     color: '#A0AEC0',
     fontSize: 13,
-    fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontWeight: '500',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pointsValue: {
     color: '#F6AD55',
-    fontSize: 36,
-    fontWeight: '800',
+    fontSize: 37,
+    fontWeight: '700',
     marginVertical: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   chargeButton: {
     backgroundColor: '#F6AD5533',
@@ -363,9 +363,9 @@ const styles = StyleSheet.create({
   },
   chargeText: {
     color: '#F6AD55',
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -382,15 +382,15 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: '#A0AEC0',
     fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontWeight: '500',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   summaryValue: {
     color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 29,
+    fontWeight: '700',
     marginTop: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   loadingIndicator: {
     marginVertical: 20,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     color: '#A0AEC0',
     fontSize: 13,
     marginTop: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ticketCard: {
     backgroundColor: '#0F1B33',
@@ -416,19 +416,19 @@ const styles = StyleSheet.create({
   ticketGame: {
     color: '#63B3ED',
     fontSize: 12,
-    fontWeight: '800',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontWeight: '700',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ticketStatus: {
     color: '#A0AEC0',
     fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontWeight: '500',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ticketMeta: {
     color: '#718096',
     fontSize: 12,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   menuSection: {
     backgroundColor: '#1A2744',
@@ -439,10 +439,10 @@ const styles = StyleSheet.create({
   menuTitle: {
     color: '#63B3ED',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     textTransform: 'uppercase',
     marginBottom: 4,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   signOutButton: {
     backgroundColor: '#E53E3E22',
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     color: '#FC8181',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   version: {
     color: '#4A5568',

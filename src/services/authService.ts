@@ -4,7 +4,7 @@
 import { supabase } from '../config/supabase';
 import { getSupabaseConfigError } from '../config/constants';
 import { UserProfile } from '../types';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 
 const AUTH_TIMEOUT_MS = 15000;
 
@@ -91,6 +91,55 @@ export async function signIn(
     return { user: data.user, session: data.session, error: null };
   } catch (err: any) {
     return { user: null, session: null, error: formatAuthError(err?.message || 'Sign in failed') };
+  }
+}
+
+export async function signInWithGoogle(): Promise<{ error: string | null }> {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return { error: configError };
+  }
+
+  try {
+    if (Platform.OS === 'web') {
+      const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const { error } = await withTimeout(
+        supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo },
+        })
+      );
+
+      return { error: error?.message ? formatAuthError(error.message) : null };
+    }
+
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          skipBrowserRedirect: true,
+          redirectTo: 'lottodream://auth/callback',
+        },
+      })
+    );
+
+    if (error) {
+      return { error: formatAuthError(error.message) };
+    }
+
+    if (!data?.url) {
+      return { error: 'Google login URL could not be created. Please try again.' };
+    }
+
+    const canOpen = await Linking.canOpenURL(data.url);
+    if (!canOpen) {
+      return { error: 'Cannot open Google login page on this device.' };
+    }
+
+    await Linking.openURL(data.url);
+    return { error: null };
+  } catch (err: any) {
+    return { error: formatAuthError(err?.message || 'Google sign in failed') };
   }
 }
 

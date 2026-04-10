@@ -1,7 +1,8 @@
 // ============================================
 // Login Screen
 // ============================================
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,9 +15,13 @@ import {
   Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { signIn } from '../services/authService';
+import { useFocusEffect } from '@react-navigation/native';
+import { signIn, signInWithGoogle } from '../services/authService';
 import { getSupabaseConfigError } from '../config/constants';
 import { isValidEmail } from '../utils/validation';
+import { LottoDreamLogo } from '../components/LottoDreamLogo';
+import { GoogleSymbol } from '../components/GoogleSymbol';
+import { getLastAuthProvider, setLastAuthProvider } from '../utils/authProviderStorage';
 
 const SHOW_ICON_OUTER_PATH =
   'M385.54,305.32c-.07-.21-.07-.43,0-.64,1.39-4.17,5.32-7.18,9.96-7.18s8.57,3.01,9.96,7.18c.07.21.07.43,0,.64-1.39,4.17-5.32,7.18-9.96,7.18s-8.57-3.01-9.96-7.18h0Z';
@@ -29,9 +34,27 @@ export function LoginScreen({ navigation, onBack }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [isLastUsedGoogle, setIsLastUsedGoogle] = useState(false);
   const configError = getSupabaseConfigError();
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      getLastAuthProvider().then((provider) => {
+        if (active) {
+          setIsLastUsedGoogle(provider === 'google');
+        }
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const showNotice = (title: string, message: string) => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -85,12 +108,37 @@ export function LoginScreen({ navigation, onBack }: any) {
     }
   };
 
+  const handleLogoPress = () => {
+    if (Platform.OS === 'web' && onBack) {
+      onBack();
+      return;
+    }
+    navigation.navigate('Login');
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLastUsedGoogle(true);
+    await setLastAuthProvider('google');
+
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    setGoogleLoading(false);
+
+    if (error) {
+      showNotice('Google Login Failed', error);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
+        <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
+          <LottoDreamLogo width={170} />
+        </TouchableOpacity>
+
         <Text style={styles.title}>Welcome back</Text>
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
@@ -101,16 +149,33 @@ export function LoginScreen({ navigation, onBack }: any) {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.googleButton}
-          onPress={() => {
-            Alert.alert('Info', 'Google login coming soon');
-          }}
-        >
-          <Text style={styles.googleButtonText}>🔵 Continue with Google</Text>
-        </TouchableOpacity>
+        <View style={styles.googleButtonWrap}>
+          {isLastUsedGoogle && (
+            <View style={styles.lastUsedBadge}>
+              <Text style={styles.lastUsedBadgeText}>LAST USED</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={handleGoogleLogin}
+            disabled={googleLoading || !!configError}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#111827" />
+            ) : (
+              <View style={styles.googleButtonContent}>
+                <GoogleSymbol size={20} />
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
-        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         <View style={styles.form}>
           <TextInput
@@ -169,6 +234,13 @@ export function LoginScreen({ navigation, onBack }: any) {
           </View>
 
           <TouchableOpacity
+            style={styles.forgotPasswordButton}
+            onPress={() => navigation.navigate('RetrievePassword', { email })}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.button, configError && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading || !!configError}
@@ -191,9 +263,7 @@ export function LoginScreen({ navigation, onBack }: any) {
         </View>
 
         <Text style={styles.footer}>
-          By continuing, you agree to Supabase's{' '}
-          <Text style={{ textDecorationLine: 'underline' }}>Terms of Service</Text> and{' '}
-          <Text style={{ textDecorationLine: 'underline' }}>Privacy Policy</Text>, and to receive periodic emails with updates.
+          By continuing, you agree to LottoDream's Terms of Service and Privacy Policy.
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -214,18 +284,22 @@ const styles = StyleSheet.create({
     alignSelf: 'center' as any,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '800',
+    fontSize: 30,
+    fontWeight: '700',
     color: '#000000',
     textAlign: 'center',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   subtitle: {
     fontSize: 14,
     color: '#718096',
     textAlign: 'center',
     marginBottom: 24,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  logoButton: {
+    alignSelf: 'center',
+    marginBottom: 18,
   },
   form: {
     gap: 14,
@@ -241,22 +315,22 @@ const styles = StyleSheet.create({
   errorBannerTitle: {
     color: '#991B1B',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 4,
   },
   errorBannerText: {
     color: '#7F1D1D',
     fontSize: 12,
     lineHeight: 17,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   input: {
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fontSize: 16,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
     color: '#000000',
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -268,7 +342,7 @@ const styles = StyleSheet.create({
     marginTop: -8,
     fontSize: 12,
     color: '#DC2626',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   passwordRow: {
     backgroundColor: '#F3F4F6',
@@ -283,8 +357,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fontSize: 16,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
     color: '#000000',
   },
   showHideButton: {
@@ -294,6 +368,16 @@ const styles = StyleSheet.create({
   showHideSvg: {
     width: 20,
     height: 16,
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+  },
+  forgotPasswordText: {
+    color: '#4B5563',
+    fontSize: 12,
+    fontWeight: '400',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   button: {
     backgroundColor: '#1ABC9C',
@@ -307,9 +391,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
+    fontWeight: '500',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   linkButton: {
     alignItems: 'center',
@@ -317,19 +401,28 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: '#718096',
-    fontSize: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 13,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   linkBold: {
     fontWeight: '600',
     color: '#000000',
   },
-  dividerText: {
-    textAlign: 'center',
-    color: '#9CA3AF',
-    fontSize: 14,
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     marginVertical: 16,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#D1D5DB',
+  },
+  dividerText: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   footer: {
     fontSize: 12,
@@ -337,21 +430,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 32,
     lineHeight: 18,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  googleButtonWrap: {
+    position: 'relative',
+    marginTop: 8,
+    overflow: 'visible',
   },
   googleButton: {
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
     borderWidth: 1,
     borderColor: '#D1D5DB',
+  },
+  lastUsedBadge: {
+    position: 'absolute',
+    right: -10,
+    top: -11,
+    backgroundColor: '#065F46',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    zIndex: 2,
+  },
+  lastUsedBadgeText: {
+    color: '#A7F3D0',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
   googleButtonText: {
     color: '#000000',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

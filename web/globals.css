@@ -1,25 +1,72 @@
-/* Global Web Stylesheet - Inter Font */
-/* This file applies Inter font to the entire web application */
+/* Global Web Stylesheet - Rubik Font */
+/* This file applies Rubik font to the entire web application */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800;900&display=swap');
 
 * {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 html,
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ensure all React Native Web text uses Inter */
+/* Ensure all React Native Web text uses Rubik */
 body > div > div,
 div > span,
 div > p,
 button,
 input,
 textarea {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Button Hover Effects */
+/* Primary buttons (blue) */
+[data-button-type="primary"]:hover {
+  opacity: 0.85;
+  transition: opacity 0.2s ease-in-out;
+}
+
+[data-button-type="primary"]:active {
+  opacity: 0.7;
+}
+
+/* Outline buttons (bordered) */
+[data-button-type="outline"]:hover {
+  opacity: 0.85;
+  transition: opacity 0.2s ease-in-out;
+}
+
+[data-button-type="outline"]:active {
+  opacity: 0.7;
+}
+
+/* Secondary buttons */
+[data-button-type="secondary"]:hover {
+  opacity: 0.8;
+  transition: opacity 0.2s ease-in-out;
+}
+
+[data-button-type="secondary"]:active {
+  opacity: 0.6;
+}
+
+/* Nav login button */
+[data-button-type="nav"]:hover {
+  opacity: 0.8;
+  transition: opacity 0.2s ease-in-out;
+}
+
+[data-button-type="nav"]:active {
+  opacity: 0.6;
+}
+
+/* General interactive elements */
+button:hover,
+[role="button"]:hover {
+  transition: opacity 0.2s ease-in-out;
 }

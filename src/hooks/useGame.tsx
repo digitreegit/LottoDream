@@ -81,6 +81,6 @@ const styles = StyleSheet.create({
     color: '#A0AEC0',
     fontWeight: '700',
     fontSize: 15,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   number: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   row: {
     flexDirection: 'row',

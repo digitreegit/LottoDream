@@ -246,12 +246,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   title: {
-    fontSize: 24,
+    fontSize: 27,
     fontWeight: '800',
     color: '#FFFFFF',
     textAlign: 'center',
     marginVertical: 16,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   rangeSelector: {
     flexDirection: 'row',
@@ -271,19 +271,19 @@ const styles = StyleSheet.create({
   rangeText: {
     color: '#A0AEC0',
     fontWeight: '600',
-    fontSize: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   rangeTextActive: {
     color: '#FFFFFF',
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#A0AEC0',
     textAlign: 'center',
     marginBottom: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   card: {
     backgroundColor: '#1A2744',
@@ -292,17 +292,17 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   cardTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   cardSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#718096',
     marginBottom: 12,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   numberList: {
     gap: 8,
@@ -315,9 +315,9 @@ const styles = StyleSheet.create({
   },
   rank: {
     color: '#718096',
-    fontSize: 12,
+    fontSize: 13,
     width: 24,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   numberBadge: {
     width: 36,
@@ -329,17 +329,17 @@ const styles = StyleSheet.create({
   numberBadgeText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   freq: {
     color: '#A0AEC0',
-    fontSize: 13,
+    fontSize: 14,
     width: 96,
     minWidth: 96,
     maxWidth: 96,
     flexShrink: 0,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   barTrack: {
     flex: 1,
@@ -367,14 +367,14 @@ const styles = StyleSheet.create({
   chipNumber: {
     color: '#FEFCBF',
     fontWeight: '700',
-    fontSize: 18,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 20,
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   chipSub: {
     color: '#D69E2E',
     fontSize: 10,
     marginTop: 2,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pairRow: {
     flexDirection: 'row',
@@ -386,8 +386,8 @@ const styles = StyleSheet.create({
   },
   pairCount: {
     color: '#A0AEC0',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

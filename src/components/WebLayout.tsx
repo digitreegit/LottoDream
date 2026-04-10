@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { signOut } from '../services/authService';
+import { LottoDreamLogo } from './LottoDreamLogo';
 
 interface Props {
   children: ReactNode;
@@ -38,7 +39,7 @@ export function WebLayout({ children, onSignOut }: Props) {
       {/* Top bar */}
       <View style={[styles.header, isWide && styles.headerWide]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.logo}>🎱 LottoDream</Text>
+          <LottoDreamLogo width={150} />
         </View>
         <View style={styles.headerRight}>
           {user && (
@@ -81,9 +82,8 @@ const styles = StyleSheet.create({
   },
   headerWide: { paddingHorizontal: 40 },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  logo: { fontSize: 18, fontWeight: '800', color: '#FFF', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  email: { color: '#A0AEC0', fontSize: 13, maxWidth: 200, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  email: { color: '#A0AEC0', fontSize: 13, maxWidth: 200, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   signOutBtn: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#4A5568',
   },
-  signOutText: { color: '#E2E8F0', fontSize: 13, fontWeight: '600', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  signOutText: { color: '#E2E8F0', fontSize: 13, fontWeight: '600', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   body: {
     flex: 1,

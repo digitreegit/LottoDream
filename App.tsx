@@ -5,7 +5,7 @@ import { GameProvider } from './src/hooks/useGame';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Platform } from 'react-native';
 
-// Initialize web-specific styles (Inter font, etc.)
+// Initialize web-specific styles (Rubik font, etc.)
 if (Platform.OS === 'web') {
   require('./src/web-init.ts');
 }

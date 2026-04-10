@@ -54,18 +54,18 @@ const styles = StyleSheet.create({
     color: '#718096',
     fontWeight: '500',
     marginBottom: 4,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   value: {
     fontSize: 22,
     fontWeight: '800',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   subtitle: {
     fontSize: 11,
     color: '#A0AEC0',
     marginTop: 2,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   row: {
     flexDirection: 'row',
