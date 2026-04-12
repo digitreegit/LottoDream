@@ -253,14 +253,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000000',
     textAlign: 'center',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   subtitle: {
     fontSize: 14,
     color: '#718096',
     textAlign: 'center',
     marginBottom: 24,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   logoButton: {
     alignSelf: 'center',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#DC2626',
     fontSize: 12,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   button: {
     backgroundColor: '#1ABC9C',
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '500',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   linkButton: {
     alignItems: 'center',
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#718096',
     fontSize: 13,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   linkBold: {
     fontWeight: '600',
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   dividerText: {
     color: '#9CA3AF',
     fontSize: 13,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   footer: {
     fontSize: 12,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 32,
     lineHeight: 18,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   googleButtonWrap: {
     position: 'relative',
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.5,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   googleButtonContent: {
     flexDirection: 'row',
@@ -401,6 +401,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 15,
     fontWeight: '500',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

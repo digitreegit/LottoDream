@@ -10,14 +10,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
-import { generatePrediction, generateAllPredictions } from '../services/predictionEngine';
-import { purchasePredictionSet, savePredictionSet } from '../services/ticketService';
-import { PredictionSet, PredictionMode } from '../types';
+import { generatePrediction, generateAllPredictions, generateLuckyDatesPrediction, extractNumbersFromDate } from '../services/predictionEngine';
+import { savePredictionSet } from '../services/ticketService';
+import { PredictionSet, PredictionMode, LuckyDate } from '../types';
 
 const MODE_INFO: Record<PredictionMode, { icon: string; label: string; desc: string }> = {
   hot: {
@@ -45,6 +46,11 @@ const MODE_INFO: Record<PredictionMode, { icon: string; label: string; desc: str
     label: 'Pure Random',
     desc: '완전 랜덤 추첨',
   },
+  lucky: {
+    icon: '✨',
+    label: 'Lucky Dates',
+    desc: '특별한 날짜 기반 픽',
+  },
 };
 
 export function PredictScreen() {
@@ -54,6 +60,13 @@ export function PredictScreen() {
   const [predictions, setPredictions] = useState<PredictionSet[]>([]);
   const [generating, setGenerating] = useState(false);
   const [selectedMode, setSelectedMode] = useState<PredictionMode | null>(null);
+
+  // Lucky Dates state
+  const [luckyDates, setLuckyDates] = useState<LuckyDate[]>([]);
+  const [showLuckyPanel, setShowLuckyPanel] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newWeight, setNewWeight] = useState<1 | 2 | 3>(2);
 
   const handleGenerateAll = useCallback(() => {
     if (draws.length === 0) {
@@ -102,20 +115,47 @@ export function PredictScreen() {
     Alert.alert('Saved', 'Your number set was saved to your account.');
   }, [user]);
 
-  const handleBuy = useCallback(async (prediction: PredictionSet) => {
-    if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to purchase tickets.');
+  const handleAddLuckyDate = useCallback(() => {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!newLabel.trim()) {
+      Alert.alert('Missing Label', '날짜 이름을 입력해주세요. (예: 생일, 기념일)');
       return;
     }
-
-    const { error } = await purchasePredictionSet(prediction);
-    if (error) {
-      Alert.alert('Purchase Failed', error);
+    if (!dateRegex.test(newDate.trim())) {
+      Alert.alert('날짜 형식 오류', 'YYYY-MM-DD 형식으로 입력해주세요. (예: 1990-03-15)');
       return;
     }
+    setLuckyDates((prev) => [
+      ...prev,
+      { id: `ld_${Date.now()}`, label: newLabel.trim(), date: newDate.trim(), weight: newWeight },
+    ]);
+    setNewLabel('');
+    setNewDate('');
+    setNewWeight(2);
+  }, [newLabel, newDate, newWeight]);
 
-    Alert.alert('Ticket Purchased', `Ticket saved for the next ${config.name} draw.`);
-  }, [config.name, user]);
+  const handleRemoveLuckyDate = useCallback((id: string) => {
+    setLuckyDates((prev) => prev.filter((ld) => ld.id !== id));
+  }, []);
+
+  const handleGenerateLucky = useCallback(() => {
+    if (luckyDates.length === 0) return;
+    if (draws.length === 0) {
+      Alert.alert('No Data', 'Please wait for draw data to load');
+      return;
+    }
+    setGenerating(true);
+    setTimeout(() => {
+      const result = generateLuckyDatesPrediction(draws, luckyDates, game);
+      setPredictions((prev) => {
+        const filtered = prev.filter((p) => p.mode !== 'lucky');
+        return [result, ...filtered];
+      });
+      setSelectedMode('lucky');
+      setGenerating(false);
+    }, 100);
+  }, [luckyDates, draws, game]);
+
 
   return (
     <ScrollView
@@ -166,6 +206,124 @@ export function PredictScreen() {
         )}
       </TouchableOpacity>
 
+      {/* ── Lucky Dates Panel ── */}
+      <View style={styles.luckyPanel}>
+        <TouchableOpacity
+          style={styles.luckyPanelHeader}
+          onPress={() => setShowLuckyPanel(!showLuckyPanel)}
+        >
+          <View>
+            <Text style={styles.luckyPanelTitle}>✨ Lucky Dates</Text>
+            <Text style={styles.luckyPanelSubtitle}>
+              생일·기념일로 나만의 번호 조합 만들기
+            </Text>
+          </View>
+          <Text style={styles.luckyPanelChevron}>{showLuckyPanel ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {showLuckyPanel && (
+          <>
+            <Text style={styles.luckyPanelDesc}>
+              특별한 날짜에서 숫자를 추출하고 가중치를 설정하면 해당 번호들이 우선적으로 반영된 픽을 생성해요.
+            </Text>
+
+            {/* Input Form */}
+            <View style={styles.luckyForm}>
+              <TextInput
+                style={styles.luckyInput}
+                placeholder="이름 (예: 생일, 결혼기념일)"
+                placeholderTextColor="#4A5568"
+                value={newLabel}
+                onChangeText={setNewLabel}
+              />
+              <TextInput
+                style={styles.luckyInput}
+                placeholder="날짜: YYYY-MM-DD"
+                placeholderTextColor="#4A5568"
+                value={newDate}
+                onChangeText={setNewDate}
+                keyboardType="numbers-and-punctuation"
+              />
+              <View style={styles.luckyWeightRow}>
+                <Text style={styles.luckyWeightLabel}>가중치</Text>
+                {([1, 2, 3] as const).map((w) => (
+                  <TouchableOpacity
+                    key={w}
+                    style={[styles.luckyWeightBtn, newWeight === w && styles.luckyWeightBtnActive]}
+                    onPress={() => setNewWeight(w)}
+                  >
+                    <Text
+                      style={[
+                        styles.luckyWeightBtnText,
+                        newWeight === w && styles.luckyWeightBtnTextActive,
+                      ]}
+                    >
+                      {w === 1 ? '●○○' : w === 2 ? '●●○' : '●●●'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity style={styles.luckyAddBtn} onPress={handleAddLuckyDate}>
+                <Text style={styles.luckyAddBtnText}>+ 날짜 추가</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Saved dates list */}
+            {luckyDates.length > 0 && (
+              <View style={styles.luckyDatesList}>
+                {luckyDates.map((ld) => {
+                  const extracted = extractNumbersFromDate(ld.date, config.whiteMax);
+                  return (
+                    <View key={ld.id} style={styles.luckyDateRow}>
+                      <View style={styles.luckyDateMain}>
+                        <View style={styles.luckyDateTopRow}>
+                          <Text style={styles.luckyDateLabel}>{ld.label}</Text>
+                          <Text style={styles.luckyDateValue}>{ld.date}</Text>
+                          <Text style={styles.luckyDateWeight}>
+                            {ld.weight === 1 ? '●○○' : ld.weight === 2 ? '●●○' : '●●●'}
+                          </Text>
+                        </View>
+                        {extracted.length > 0 && (
+                          <View style={styles.luckyExtractedRow}>
+                            <Text style={styles.luckyExtractedLabel}>추출: </Text>
+                            {extracted.map((n) => (
+                              <View key={n} style={styles.luckyExtractedChip}>
+                                <Text style={styles.luckyExtractedNum}>{n}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.luckyRemoveBtn}
+                        onPress={() => handleRemoveLuckyDate(ld.id)}
+                      >
+                        <Text style={styles.luckyRemoveBtnText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Generate button */}
+            {luckyDates.length > 0 && (
+              <TouchableOpacity
+                style={styles.luckyGenerateBtn}
+                onPress={handleGenerateLucky}
+                disabled={generating || dataLoading}
+              >
+                {generating ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.luckyGenerateBtnText}>✨ Lucky Pick 생성</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
+
       {/* Results */}
       {predictions.length > 0 && (
         <View style={styles.results}>
@@ -204,18 +362,42 @@ export function PredictScreen() {
                   >
                     <Text style={styles.actionText}>🔄 Regenerate</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.buyButton]}
-                    onPress={() => handleBuy(pred)}
-                  >
-                    <Text style={[styles.actionText, styles.buyText]}>
-                      🎫 Buy Ticket
-                    </Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             );
           })}
+        </View>
+      )}
+
+      {/* Score Explanation Box */}
+      {predictions.length > 0 && (
+        <View style={styles.scoreExplainBox}>
+          <Text style={styles.scoreExplainTitle}>📊 Score란?</Text>
+          <Text style={styles.scoreExplainBody}>
+            Score는 실제 당첨 확률이 아니라, 생성된 번호 조합이{' '}
+            <Text style={styles.scoreExplainHighlight}>역대 당첨 번호들의 패턴</Text>과
+            얼마나 유사한지를 0~100으로 나타내는 통계적 품질 지표예요.
+          </Text>
+          <View style={styles.scoreExplainRows}>
+            {[
+              { label: '홀짝 비율', desc: '홀수 2~3개 / 짝수 2~3개', bonus: '+5' },
+              { label: '저고 비율', desc: '저번호(1~34) 2~3개 / 고번호 2~3개', bonus: '+5' },
+              { label: '합계 범위', desc: '5개 번호의 합이 100~200 사이', bonus: '+5' },
+              { label: '평균 근접', desc: '역대 평균 합계와 30 이내 차이', bonus: '+3' },
+              { label: '연속 번호', desc: '연속 번호 포함 (역대 출현율 20%+)', bonus: '+2' },
+            ].map((row) => (
+              <View key={row.label} style={styles.scoreExplainRow}>
+                <View style={styles.scoreExplainRowLeft}>
+                  <Text style={styles.scoreExplainRowLabel}>{row.label}</Text>
+                  <Text style={styles.scoreExplainRowDesc}>{row.desc}</Text>
+                </View>
+                <Text style={styles.scoreExplainRowBonus}>{row.bonus}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.scoreExplainNote}>
+            로또는 모든 조합의 실제 당첨 확률이 동일합니다. Score가 높을수록 통계적으로 자연스러운 조합일 뿐이에요.
+          </Text>
         </View>
       )}
 
@@ -252,7 +434,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginTop: 16,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   subtitle: {
     fontSize: 13,
@@ -260,7 +442,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 18,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   modeGrid: {
     flexDirection: 'row',
@@ -291,7 +473,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
     marginBottom: 4,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   modeLabelActive: {
     color: '#63B3ED',
@@ -300,7 +482,7 @@ const styles = StyleSheet.create({
     color: '#718096',
     fontSize: 11,
     textAlign: 'center',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   generateButton: {
     backgroundColor: '#38A169',
@@ -313,7 +495,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   results: {
     gap: 12,
@@ -323,7 +505,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   resultCard: {
     backgroundColor: '#1A2744',
@@ -340,7 +522,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreBadge: {
     backgroundColor: '#2D3748',
@@ -352,7 +534,7 @@ const styles = StyleSheet.create({
     color: '#F6AD55',
     fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   resultBalls: {
     alignItems: 'center',
@@ -363,7 +545,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 12,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   resultActions: {
     flexDirection: 'row',
@@ -380,38 +562,310 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  buyButton: {
-    backgroundColor: '#3182CE',
-  },
-  buyText: {
-    fontWeight: '700',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   disclaimer: {
-    marginTop: 24,
+    marginTop: 16,
     backgroundColor: '#1A2744',
     borderRadius: 14,
     padding: 16,
   },
+
+  /* Score Explanation Box */
+  scoreExplainBox: {
+    marginTop: 12,
+    backgroundColor: '#0F1E38',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#2D3748',
+    padding: 16,
+  },
+  scoreExplainTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  scoreExplainBody: {
+    color: '#A0AEC0',
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 14,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  scoreExplainHighlight: {
+    color: '#F6AD55',
+    fontWeight: '600',
+  },
+  scoreExplainRows: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  scoreExplainRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1A2744',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  scoreExplainRowLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  scoreExplainRowLabel: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  scoreExplainRowDesc: {
+    color: '#718096',
+    fontSize: 11,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  scoreExplainRowBonus: {
+    color: '#68D391',
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  scoreExplainNote: {
+    color: '#4A5568',
+    fontSize: 11,
+    lineHeight: 16,
+    fontStyle: 'italic',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+
   disclaimerTitle: {
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 15,
     marginBottom: 8,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   disclaimerText: {
     color: '#A0AEC0',
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 8,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   disclaimerWarn: {
     color: '#F6AD55',
     fontSize: 12,
     fontStyle: 'italic',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+
+  /* Lucky Dates Panel */
+  luckyPanel: {
+    backgroundColor: '#111C35',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#7B61FF44',
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  luckyPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  luckyPanelTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyPanelSubtitle: {
+    color: '#718096',
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyPanelChevron: {
+    color: '#7B61FF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  luckyPanelDesc: {
+    color: '#A0AEC0',
+    fontSize: 12,
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyForm: {
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 12,
+  },
+  luckyInput: {
+    backgroundColor: '#1A2744',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: '#2D3748',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyWeightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  luckyWeightLabel: {
+    color: '#A0AEC0',
+    fontSize: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    marginRight: 4,
+  },
+  luckyWeightBtn: {
+    backgroundColor: '#1A2744',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#2D3748',
+  },
+  luckyWeightBtnActive: {
+    backgroundColor: '#2D1B69',
+    borderColor: '#7B61FF',
+  },
+  luckyWeightBtnText: {
+    color: '#718096',
+    fontSize: 13,
+    letterSpacing: 1,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyWeightBtnTextActive: {
+    color: '#B794F4',
+  },
+  luckyAddBtn: {
+    backgroundColor: '#2D1B69',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#7B61FF',
+  },
+  luckyAddBtnText: {
+    color: '#B794F4',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyDatesList: {
+    paddingHorizontal: 16,
+    gap: 6,
+    marginBottom: 12,
+  },
+  luckyDateRow: {
+    backgroundColor: '#1A2744',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#2D3748',
+  },
+  luckyDateMain: {
+    flex: 1,
+    gap: 6,
+  },
+  luckyDateTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  luckyDateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  luckyDateLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyDateValue: {
+    color: '#A0AEC0',
+    fontSize: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyDateWeight: {
+    color: '#7B61FF',
+    fontSize: 11,
+    letterSpacing: 1,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyExtractedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  luckyExtractedLabel: {
+    color: '#4A5568',
+    fontSize: 10,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyExtractedChip: {
+    backgroundColor: '#2D1B69',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#553C9A',
+  },
+  luckyExtractedNum: {
+    color: '#B794F4',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  luckyRemoveBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2D3748',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  luckyRemoveBtnText: {
+    color: '#FC8181',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '300',
+  },
+  luckyGenerateBtn: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#553C9A',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#7B61FF',
+  },
+  luckyGenerateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

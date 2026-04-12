@@ -144,7 +144,10 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
 }
 
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) {
+    throw new Error(formatAuthError(error.message));
+  }
 }
 
 export async function getProfile(): Promise<UserProfile | null> {

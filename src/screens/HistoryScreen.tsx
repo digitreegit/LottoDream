@@ -69,7 +69,7 @@ export function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>📋 Draw History</Text>
+      <Text style={styles.title}>🏆 Drawing</Text>
 
       {/* Game Selector */}
       <GameSelector />
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingTop: 16,
     paddingBottom: 8,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -138,14 +138,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#2D3748',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   searchResult: {
     color: '#63B3ED',
     fontSize: 13,
     marginTop: 4,
     marginLeft: 4,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   list: {
     paddingHorizontal: 16,
@@ -168,25 +168,25 @@ const styles = StyleSheet.create({
     color: '#718096',
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   drawDate: {
     color: '#A0AEC0',
     fontSize: 14,
     fontWeight: '500',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pp: {
     color: '#F6AD55',
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   empty: {
     color: '#718096',
     textAlign: 'center',
     marginTop: 40,
     fontSize: 18,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

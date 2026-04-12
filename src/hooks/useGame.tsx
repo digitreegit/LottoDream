@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { GameType, GameConfig } from '../types';
 import { getGameConfig, GAME_CONFIGS } from '../config/constants';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 interface GameContextValue {
   game: GameType;
@@ -38,6 +38,11 @@ export function GameSelector() {
   const { game, setGame } = useGame();
   const games: GameType[] = ['powerball', 'megamillions'];
 
+  const logoMap = {
+    powerball: require('../../assets/powerball-logo.png'),
+    megamillions: require('../../assets/mega-millions-logo.png'),
+  };
+
   return (
     <View style={styles.container}>
       {games.map((g) => {
@@ -52,9 +57,10 @@ export function GameSelector() {
             ]}
             onPress={() => setGame(g)}
           >
-            <Text style={[styles.tabText, active && { color: cfg.accentColor }]}>
-              {cfg.icon} {cfg.shortName}
-            </Text>
+            <Image
+              source={logoMap[g as keyof typeof logoMap]}
+              style={[styles.logo, active && { opacity: 1 }, !active && { opacity: 0.6 }]}
+            />
           </TouchableOpacity>
         );
       })}
@@ -77,10 +83,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#2D3748',
   },
-  tabText: {
-    color: '#A0AEC0',
-    fontWeight: '700',
-    fontSize: 15,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  logo: {
+    width: 60,
+    height: 40,
+    resizeMode: 'contain',
   },
 });

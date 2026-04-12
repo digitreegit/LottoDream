@@ -80,7 +80,16 @@ export type PredictionMode =
   | 'cold'       // 오래 안 나온 번호 위주
   | 'balanced'   // 핫+콜드 혼합
   | 'anticrowd'  // 사람들이 안 고르는 패턴
-  | 'random';    // 순수 랜덤
+  | 'random'     // 순수 랜덤
+  | 'lucky';     // 특별한 날짜 기반 개인 픽
+
+/** A user-defined lucky date entry */
+export interface LuckyDate {
+  id: string;
+  label: string;    // e.g. "Birthday", "Anniversary"
+  date: string;     // YYYY-MM-DD
+  weight: 1 | 2 | 3;  // influence level: normal / strong / very strong
+}
 
 /** User profile */
 export interface UserProfile {

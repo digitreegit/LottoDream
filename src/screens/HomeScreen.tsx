@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#A0AEC0',
     marginTop: 4,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   card: {
     backgroundColor: '#1A2744',

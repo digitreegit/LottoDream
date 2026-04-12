@@ -1,11 +1,11 @@
 // ============================================
 // Typography & Font Configuration
 // ============================================
-// Global font settings using Rubik
-// Font family: Rubik (https://fonts.google.com/specimen/Rubik)
+// Global font settings using Inter
+// Font family: Inter (https://fonts.google.com/specimen/Inter)
 
 export const FONTS = {
-  family: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   weights: {
     light: '300',
     normal: '400',

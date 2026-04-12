@@ -2,7 +2,7 @@
 // Prediction Engine
 // Generates lottery number recommendations
 // ============================================
-import { Draw, PredictionSet, PredictionMode, AnalysisResult, GameType, GameConfig } from '../types';
+import { Draw, PredictionSet, PredictionMode, AnalysisResult, GameType, GameConfig, LuckyDate } from '../types';
 import { analyzeDraws } from './analysisEngine';
 import { getGameConfig } from '../config/constants';
 import * as Crypto from 'expo-crypto';
@@ -278,6 +278,118 @@ function adjustScore(
 
 function generateId(): string {
   return `pred_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+}
+
+// ---- Lucky Dates Strategy ----
+
+/**
+ * Extract candidate numbers from a YYYY-MM-DD date string within [1, whiteMax].
+ */
+export function extractNumbersFromDate(dateStr: string, whiteMax: number): number[] {
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return [];
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const day = parseInt(parts[2], 10);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return [];
+
+  const raw: number[] = [];
+
+  // Day (1-31)
+  if (day >= 1 && day <= whiteMax) raw.push(day);
+
+  // Month (1-12)
+  if (month >= 1 && month <= whiteMax) raw.push(month);
+
+  // Last 2 digits of year, wrapped into [1, whiteMax]
+  const y2 = year % 100;
+  const y2mapped = y2 === 0 ? whiteMax : ((y2 - 1) % whiteMax) + 1;
+  if (y2mapped >= 1 && y2mapped <= whiteMax) raw.push(y2mapped);
+
+  // Sum of all date digits (e.g. 1999-07-23 → 1+9+9+9+0+7+2+3 = 40 → wrap)
+  const digitSum = dateStr
+    .replace(/[^0-9]/g, '')
+    .split('')
+    .reduce((acc, ch) => acc + parseInt(ch, 10), 0);
+  const dsMapped = digitSum === 0 ? 1 : ((digitSum - 1) % whiteMax) + 1;
+  if (dsMapped >= 1 && dsMapped <= whiteMax) raw.push(dsMapped);
+
+  // Day + Month
+  const dm = day + month;
+  if (dm >= 1 && dm <= whiteMax) raw.push(dm);
+
+  return [...new Set(raw)];
+}
+
+function luckyDatesStrategy(
+  luckyDates: LuckyDate[],
+  all: AnalysisResult,
+  config: GameConfig
+): { whites: number[]; pb: number; score: number; explanation: string } {
+  // Build weighted pool: each lucky number repeated by its weight
+  const weightedPool: number[] = [];
+  for (const ld of luckyDates) {
+    const nums = extractNumbersFromDate(ld.date, config.whiteMax);
+    for (const n of nums) {
+      for (let i = 0; i < ld.weight; i++) {
+        weightedPool.push(n);
+      }
+    }
+  }
+
+  // Baseline: top-20 hot numbers appear once each as fallback
+  const basePool = all.hotWhite.slice(0, 20);
+  const combined = [...weightedPool, ...basePool];
+
+  // Shuffle and pick first 5 unique valid numbers
+  const shuffled = combined.slice().sort(() => Math.random() - 0.5);
+  const whites: number[] = [];
+  for (const n of shuffled) {
+    if (n >= 1 && n <= config.whiteMax && !whites.includes(n)) {
+      whites.push(n);
+      if (whites.length === config.whiteCount) break;
+    }
+  }
+  // Fill any remaining slots with random numbers
+  while (whites.length < config.whiteCount) {
+    const n = Math.floor(Math.random() * config.whiteMax) + 1;
+    if (!whites.includes(n)) whites.push(n);
+  }
+
+  const pb = Math.floor(Math.random() * config.bonusMax) + 1;
+  const labels = luckyDates.map((ld) => ld.label).join(', ');
+
+  return {
+    whites,
+    pb,
+    score: 68,
+    explanation: `✨ ${labels}에서 추출한 행운 번호에 가중치를 부여해 선별.`,
+  };
+}
+
+/**
+ * Generate a lucky-dates prediction set using user-defined date entries.
+ */
+export function generateLuckyDatesPrediction(
+  draws: Draw[],
+  luckyDates: LuckyDate[],
+  game: GameType = 'powerball'
+): PredictionSet {
+  const config = getGameConfig(game);
+  const analysis = analyzeDraws(draws, 'prediction', config);
+  const { whites, pb, score, explanation } = luckyDatesStrategy(luckyDates, analysis, config);
+  const finalScore = adjustScore(whites, pb, analysis, score, config);
+
+  return {
+    id: generateId(),
+    game,
+    whites: whites.sort((a, b) => a - b),
+    powerball: pb,
+    mode: 'lucky',
+    score: finalScore,
+    explanation,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 // ---- Monte Carlo Simulation ----

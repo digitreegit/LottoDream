@@ -211,7 +211,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           Ready to Play Smarter?
         </Text>
         <Text style={styles.ctaBannerSub}>
-          Sign up now to save your picks, track results, and purchase tickets — on any device.
+          Sign up now to save your picks, track results, and play with your own lucky number combos — on any device.
         </Text>
         {/* @ts-ignore */}
         <TouchableOpacity 
@@ -278,10 +278,9 @@ const FEATURES = [
     svgPath: HISTORY_ICON_PATH,
   },
   {
-    icon: '💰',
-    title: 'Ticket Purchase',
-    desc: 'Buy tickets using points. Track your purchases and check results automatically.',
-    svgPath: DOLLAR_ICON_PATH,
+    icon: '✨',
+    title: 'Lucky Dates',
+    desc: 'Pick your own lucky numbers from birthdays, anniversaries, or any special date — add weights to personalize your combo.',
   },
   {
     icon: '📱',
@@ -311,8 +310,8 @@ const STEPS = [
     desc: 'Generate AI-powered number combinations using 5 different strategies.',
   },
   {
-    title: 'Save & Purchase',
-    desc: 'Save your favorite picks or buy tickets with points right from the app.',
+    title: 'Save & Play',
+    desc: 'Save your favorite picks or build a Lucky Dates combo from meaningful numbers. Track your sets anytime.',
   },
 ];
 
@@ -344,7 +343,7 @@ const styles = StyleSheet.create({
   navWide: { paddingHorizontal: 48 },
   navLogoWrap: { justifyContent: 'center', minHeight: 24 },
   navLinks: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  navLink: { color: '#A0AEC0', fontSize: 13, fontWeight: '400', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLink: { color: '#A0AEC0', fontSize: 13, fontWeight: '400', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   navLoginBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -353,7 +352,7 @@ const styles = StyleSheet.create({
     borderColor: '#718096',
     backgroundColor: 'rgba(113, 128, 150, 0.08)',
   },
-  navLoginText: { color: '#E2E8F0', fontSize: 13, fontWeight: '500', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLoginText: { color: '#E2E8F0', fontSize: 13, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Hero */
   hero: {
@@ -370,7 +369,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textAlign: 'center',
     lineHeight: 42,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   heroTitleWide: { fontSize: 48, lineHeight: 60, fontWeight: '500' },
   heroSub: {
@@ -380,7 +379,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     maxWidth: 560,
     lineHeight: 24,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   heroSubWide: { fontSize: 18, lineHeight: 28, maxWidth: 640 },
   heroCtas: {
@@ -400,7 +399,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
   },
-  ctaPrimaryText: { color: '#FFF', fontSize: 17, fontWeight: '500', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaPrimaryText: { color: '#FFF', fontSize: 17, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   ctaOutline: {
     borderWidth: 1,
     borderColor: '#4A5568',
@@ -412,7 +411,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(71, 85, 105, 0.08)',
   },
-  ctaOutlineText: { color: '#E2E8F0', fontSize: 17, fontWeight: '500', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaOutlineText: { color: '#E2E8F0', fontSize: 17, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   /* Section */
   section: { paddingHorizontal: 24, paddingVertical: 48 },
   featuresSection: { marginBottom: 50 },
@@ -424,7 +423,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textAlign: 'center',
     marginBottom: 8,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   sectionSub: {
     fontSize: 14,
@@ -433,7 +432,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     maxWidth: 500,
     alignSelf: 'center' as any,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 
   /* Feature Cards */
@@ -460,8 +459,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureIcon: { fontSize: FEATURE_ICON_SIZE, marginBottom: 12 },
-  featureTitle: { fontSize: 17, fontWeight: '600', color: '#FFF', marginBottom: 6, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  featureDesc: { fontSize: 13, color: '#A0AEC0', lineHeight: 20, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  featureTitle: { fontSize: 17, fontWeight: '600', color: '#FFF', marginBottom: 6, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  featureDesc: { fontSize: 13, color: '#A0AEC0', lineHeight: 20, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Steps */
   stepsRow: { gap: 16, width: '100%' },
@@ -486,16 +485,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  stepNum: { color: '#FFF', fontSize: 18, fontWeight: '700', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  stepNum: { color: '#FFF', fontSize: 18, fontWeight: '700', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   stepTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: '#FFF',
     marginBottom: 6,
     textAlign: 'center',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  stepDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 19, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  stepDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 19, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Games */
   gamesRow: { gap: 16, width: '100%' },
@@ -528,8 +527,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     resizeMode: 'contain',
   },
-  gameTitle: { fontSize: 22, fontWeight: '500', color: '#FFF', marginBottom: 8, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  gameDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 21, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  gameTitle: { fontSize: 22, fontWeight: '500', color: '#FFF', marginBottom: 8, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  gameDesc: { fontSize: 13, color: '#A0AEC0', textAlign: 'center', lineHeight: 21, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* CTA Banner */
   ctaBanner: {
@@ -546,7 +545,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textAlign: 'center',
     marginBottom: 10,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ctaBannerTitleWide: { fontSize: 31 },
   ctaBannerSub: {
@@ -555,7 +554,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     maxWidth: 480,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ctaBannerBtn: {
     backgroundColor: '#3182CE',
@@ -563,7 +562,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 40,
   },
-  ctaBannerBtnText: { color: '#FFF', fontSize: 17, fontWeight: '600', fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaBannerBtnText: { color: '#FFF', fontSize: 17, fontWeight: '600', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Store badges */
   storeBadgesRow: {
@@ -594,14 +593,14 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   storeBadgeTitle: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 2,
-    fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 
   /* Footer */
@@ -613,5 +612,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1A2744',
   },
-  footerText: { color: '#4A5568', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Rubik, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  footerText: { color: '#4A5568', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 });
