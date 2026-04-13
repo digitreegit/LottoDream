@@ -86,7 +86,7 @@ export function WebLayout({ children, activeMenu, onMenuPress, onProfilePress, o
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0B1426',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -97,9 +97,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginHorizontal: 10,
     borderRadius: 14,
-    backgroundColor: '#0D1B2A',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#1A2744',
+    borderBottomColor: '#E2E8F0',
   },
   headerWide: { paddingHorizontal: 40, marginHorizontal: 16, marginTop: 14 },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
@@ -114,16 +114,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   menuBtnActive: {
-    backgroundColor: 'rgba(99, 179, 237, 0.18)',
+    backgroundColor: 'rgba(59, 130, 246, 0.18)',
   },
   menuText: {
-    color: '#A0AEC0',
+    color: '#1F2937',
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   menuTextActive: {
-    color: '#63B3ED',
+    color: '#2563EB',
   },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   profileBtn: {
@@ -134,10 +134,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#4A5568',
+    borderColor: '#CBD5E1',
   },
   email: {
-    color: '#A0AEC0',
+    color: '#475569',
     fontSize: 13,
     maxWidth: 200,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',

@@ -98,12 +98,12 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         sceneStyle: {
-          backgroundColor: '#0B1426',
+          backgroundColor: '#FFFFFF',
           paddingTop: Platform.OS === 'ios' ? 28 : 30,
         },
         tabBarStyle: {
-          backgroundColor: '#0B1426',
-          borderTopColor: '#1A2744',
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E2E8F0',
           borderTopWidth: 1,
           marginBottom: 16,
           marginHorizontal: 10,
@@ -112,8 +112,8 @@ function MainTabs() {
           paddingTop: 4,
           height: 60,
         },
-        tabBarActiveTintColor: '#63B3ED',
-        tabBarInactiveTintColor: '#4A5568',
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#64748B',
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
@@ -214,7 +214,7 @@ export function AppNavigator() {
       <NavigationContainer>
         <AuthStackNav.Navigator
           initialRouteName="ResetPassword"
-          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B1426' } }}
+          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}
         >
           <AuthStackNav.Screen name="Login" component={LoginScreen} />
           <AuthStackNav.Screen name="Register" component={RegisterScreen} />
@@ -238,7 +238,7 @@ export function AppNavigator() {
       return (
         <NavigationContainer>
           <AuthStackNav.Navigator
-            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B1426' } }}
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}
           >
             <AuthStackNav.Screen name="Login">
               {(props) => <LoginScreen {...props} onBack={() => setWebAuthScreen('none')} />}
@@ -261,7 +261,7 @@ export function AppNavigator() {
         <NavigationContainer>
           <AuthStackNav.Navigator
             initialRouteName="Register"
-            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B1426' } }}
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}
           >
             <AuthStackNav.Screen name="Login">
               {(props) => <LoginScreen {...props} onBack={() => setWebAuthScreen('none')} />}
@@ -347,7 +347,7 @@ export function AppNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0B1426' },
+          contentStyle: { backgroundColor: '#FFFFFF' },
         }}
       >
         {/* Always allow guest access to main app */}
@@ -363,7 +363,7 @@ function AuthStack() {
     <AuthStackNav.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#0B1426' },
+        contentStyle: { backgroundColor: '#FFFFFF' },
       }}
     >
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
