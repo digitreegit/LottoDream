@@ -8,9 +8,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Alert,
   TextInput,
+  Platform,
 } from 'react-native';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
@@ -19,6 +21,18 @@ import { useAuth } from '../hooks/useAuth';
 import { generatePrediction, generateAllPredictions, generateLuckyDatesPrediction, extractNumbersFromDate } from '../services/predictionEngine';
 import { savePredictionSet } from '../services/ticketService';
 import { PredictionSet, PredictionMode, LuckyDate } from '../types';
+
+function notify(title: string, message?: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(message ? `${title}\n\n${message}` : title);
+    return;
+  }
+  if (message) {
+    Alert.alert(title, message);
+  } else {
+    Alert.alert(title);
+  }
+}
 
 const MODE_INFO: Record<PredictionMode, { icon: string; label: string; desc: string }> = {
   hot: {
@@ -70,59 +84,84 @@ export function PredictScreen() {
 
   const handleGenerateAll = useCallback(() => {
     if (draws.length === 0) {
-      Alert.alert('No Data', 'Please wait for draw data to load');
+      notify(
+        '\uB370\uC774\uD130 \uC5C6\uC74C',
+        '\uB2F9\uCCA8 \uBC88\uD638 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
+      );
       return;
     }
     setGenerating(true);
     // Run in next tick to allow UI update
     setTimeout(() => {
-      const results = generateAllPredictions(draws, game);
-      setPredictions(results);
-      setSelectedMode(null);
-      setGenerating(false);
+      try {
+        const results = generateAllPredictions(draws, game);
+        setPredictions(results);
+        setSelectedMode(null);
+      } catch (e: any) {
+        notify('생성 실패', e?.message || '번호 조합을 만들 수 없습니다.');
+      } finally {
+        setGenerating(false);
+      }
     }, 100);
-  }, [draws]);
+  }, [draws, game]);
 
   const handleGenerateSingle = useCallback(
     (mode: PredictionMode) => {
-      if (draws.length === 0) return;
+      if (draws.length === 0) {
+        notify(
+          '\uB370\uC774\uD130 \uC5C6\uC74C',
+          '\uB2F9\uCCA8 \uBC88\uD638 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
+        );
+        return;
+      }
       setGenerating(true);
       setTimeout(() => {
-        const result = generatePrediction(draws, mode, game);
-        setPredictions((prev) => {
-          const filtered = prev.filter((p) => p.mode !== mode);
-          return [result, ...filtered];
-        });
-        setSelectedMode(mode);
-        setGenerating(false);
+        try {
+          const result = generatePrediction(draws, mode, game);
+          setPredictions((prev) => {
+            const filtered = prev.filter((p) => p.mode !== mode);
+            return [result, ...filtered];
+          });
+          setSelectedMode(mode);
+        } catch (e: any) {
+          notify('생성 실패', e?.message || '이 모드의 번호를 다시 만들 수 없습니다.');
+        } finally {
+          setGenerating(false);
+        }
       }, 100);
     },
-    [draws]
+    [draws, game]
   );
 
   const handleSave = useCallback(async (prediction: PredictionSet) => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to save numbers.');
+      notify('로그인 필요', '번호를 저장하려면 로그인해주세요.');
       return;
     }
 
     const { error } = await savePredictionSet(prediction);
     if (error) {
-      Alert.alert('Save Failed', error);
+      notify('저장 실패', error);
       return;
     }
 
-    Alert.alert('Saved', 'Your number set was saved to your account.');
+    notify('\uC800\uC7A5 \uC644\uB8CC', '\uC120\uD0DD\uD55C \uBC88\uD638 \uC870\uD569\uC774 \uACC4\uC815\uC5D0 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
   }, [user]);
 
   const handleAddLuckyDate = useCallback(() => {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!newLabel.trim()) {
-      Alert.alert('Missing Label', '날짜 이름을 입력해주세요. (예: 생일, 기념일)');
+      notify(
+        '\uC774\uB984 \uC5C6\uC74C',
+        '\uB0A0\uC9DC \uC774\uB984\uC744 \uC785\uB825\uD574\uC8FC\uC138\uC694. (\uC608: \uC0DD\uC77C, \uAE30\uB150\uC77C)'
+      );
       return;
     }
     if (!dateRegex.test(newDate.trim())) {
-      Alert.alert('날짜 형식 오류', 'YYYY-MM-DD 형식으로 입력해주세요. (예: 1990-03-15)');
+      notify(
+        '\uB0A0\uC9DC \uD615\uC2DD \uC624\uB958',
+        'YYYY-MM-DD \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD574\uC8FC\uC138\uC694. (\uC608: 1990-03-15)'
+      );
       return;
     }
     setLuckyDates((prev) => [
@@ -141,18 +180,29 @@ export function PredictScreen() {
   const handleGenerateLucky = useCallback(() => {
     if (luckyDates.length === 0) return;
     if (draws.length === 0) {
-      Alert.alert('No Data', 'Please wait for draw data to load');
+      notify(
+        '\uB370\uC774\uD130 \uC5C6\uC74C',
+        '\uB2F9\uCCA8 \uBC88\uD638 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
+      );
       return;
     }
     setGenerating(true);
     setTimeout(() => {
-      const result = generateLuckyDatesPrediction(draws, luckyDates, game);
-      setPredictions((prev) => {
-        const filtered = prev.filter((p) => p.mode !== 'lucky');
-        return [result, ...filtered];
-      });
-      setSelectedMode('lucky');
-      setGenerating(false);
+      try {
+        const result = generateLuckyDatesPrediction(draws, luckyDates, game);
+        setPredictions((prev) => {
+          const filtered = prev.filter((p) => p.mode !== 'lucky');
+          return [result, ...filtered];
+        });
+        setSelectedMode('lucky');
+      } catch (e: any) {
+        notify(
+          '\uC0DD\uC131 \uC2E4\uD328',
+          e?.message || '\uB7EC\uD0A4 \uD53D\uC744 \uB9CC\uB4E4 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.'
+        );
+      } finally {
+        setGenerating(false);
+      }
     }, 100);
   }, [luckyDates, draws, game]);
 
@@ -161,6 +211,8 @@ export function PredictScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="always"
+      keyboardDismissMode="on-drag"
     >
       <Text style={styles.title}>🎯 Smart Picks</Text>
       <Text style={styles.subtitle}>
@@ -351,17 +403,29 @@ export function PredictScreen() {
                 </View>
 
                 <Text style={styles.resultExplain}>{pred.explanation}</Text>
+                {pred.backtest && pred.backtest.sampleSize > 0 && (
+                  <Text style={styles.backtestText}>
+                    Backtest {pred.backtest.sampleSize}회: 평균 화이트 매치 {pred.backtest.avgWhiteMatches.toFixed(2)} /
+                    보너스 적중률 {(pred.backtest.powerballHitRate * 100).toFixed(1)}% /
+                    3등급+ 유사 매치율 {(pred.backtest.tier3PlusRate * 100).toFixed(1)}%
+                  </Text>
+                )}
 
                 <View style={styles.resultActions}>
-                  <TouchableOpacity style={styles.actionButton} onPress={() => handleSave(pred)}>
+                  <Pressable
+                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+                    onPress={() => handleSave(pred)}
+                    android_ripple={{ color: '#4A5568' }}
+                  >
                     <Text style={styles.actionText}>💾 Save</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
                     onPress={() => handleGenerateSingle(pred.mode)}
+                    android_ripple={{ color: '#4A5568' }}
                   >
                     <Text style={styles.actionText}>🔄 Regenerate</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </View>
             );
@@ -547,6 +611,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  backtestText: {
+    color: '#90CDF4',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   resultActions: {
     flexDirection: 'row',
     gap: 8,
@@ -557,6 +628,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  actionButtonPressed: {
+    opacity: 0.85,
   },
   actionText: {
     color: '#FFFFFF',

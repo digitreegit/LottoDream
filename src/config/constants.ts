@@ -42,6 +42,16 @@ export const POWERBALL_API_URL =
 export const MEGAMILLIONS_API_URL =
   'https://data.ny.gov/resource/5xaw-6ayf.json';
 
+// Official draw feeds (MUSL/operator endpoints)
+export const POWERBALL_OFFICIAL_API_URLS = [
+  process.env.EXPO_PUBLIC_POWERBALL_OFFICIAL_API_URL || 'https://www.powerball.com/api/v1/numbers/powerball/recent?_format=json',
+  'https://www.powerball.com/api/v1/numbers/powerball/recent10?_format=json',
+];
+
+export const MEGAMILLIONS_OFFICIAL_API_URLS = [
+  process.env.EXPO_PUBLIC_MEGAMILLIONS_OFFICIAL_API_URL || 'https://www.powerball.com/api/v1/numbers/megamillions/recent?_format=json',
+];
+
 // Legacy constants (kept for backward compat)
 export const POWERBALL_WHITE_MAX = 69;
 export const POWERBALL_RED_MAX = 26;
@@ -62,6 +72,7 @@ export const GAME_CONFIGS: Record<GameType, GameConfig> = {
     multiplierLabel: 'Power Play',
     accentColor: '#E53E3E',
     apiUrl: POWERBALL_API_URL,
+    officialApiUrls: POWERBALL_OFFICIAL_API_URLS,
     dbTable: 'draws',
     lowHighSplit: 34,
   },
@@ -77,6 +88,7 @@ export const GAME_CONFIGS: Record<GameType, GameConfig> = {
     multiplierLabel: 'Megaplier',
     accentColor: '#D69E2E',
     apiUrl: MEGAMILLIONS_API_URL,
+    officialApiUrls: MEGAMILLIONS_OFFICIAL_API_URLS,
     dbTable: 'draws_megamillions',
     lowHighSplit: 35,
   },

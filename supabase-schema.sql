@@ -137,9 +137,15 @@ CREATE POLICY "Users can insert own tickets" ON tickets
 CREATE POLICY "Users can view own transactions" ON point_transactions
   FOR SELECT USING (auth.uid() = user_id);
 
--- Saved numbers: users manage their own
-CREATE POLICY "Users can manage own saved numbers" ON saved_numbers
-  FOR ALL USING (auth.uid() = user_id);
+-- Saved numbers: explicit policies so INSERT gets WITH CHECK (FOR ALL USING alone can block inserts)
+CREATE POLICY "Users can select own saved numbers" ON saved_numbers
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own saved numbers" ON saved_numbers
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own saved numbers" ON saved_numbers
+  FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own saved numbers" ON saved_numbers
+  FOR DELETE USING (auth.uid() = user_id);
 
 -- Function: Auto-create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()

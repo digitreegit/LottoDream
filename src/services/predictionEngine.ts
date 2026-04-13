@@ -18,6 +18,7 @@ export function generatePrediction(
   const config = getGameConfig(game);
   const analysis = analyzeDraws(draws, 'prediction', config);
   const recent = analyzeDraws(draws.slice(0, 50), 'recent', config);
+  const rng = createSeededRng(`${game}:${mode}:${draws.length}:${draws[0]?.draw_date || 'none'}`);
 
   let whites: number[];
   let pb: number;
@@ -26,25 +27,27 @@ export function generatePrediction(
 
   switch (mode) {
     case 'hot':
-      ({ whites, pb, score, explanation } = hotStrategy(analysis, recent, config));
+      ({ whites, pb, score, explanation } = hotStrategy(analysis, recent, config, rng));
       break;
     case 'cold':
-      ({ whites, pb, score, explanation } = coldStrategy(analysis, recent, config));
+      ({ whites, pb, score, explanation } = coldStrategy(analysis, recent, config, rng));
       break;
     case 'balanced':
-      ({ whites, pb, score, explanation } = balancedStrategy(analysis, recent, config));
+      ({ whites, pb, score, explanation } = balancedStrategy(analysis, recent, config, rng));
       break;
     case 'anticrowd':
-      ({ whites, pb, score, explanation } = antiCrowdStrategy(analysis, config));
+      ({ whites, pb, score, explanation } = antiCrowdStrategy(analysis, config, rng));
       break;
     case 'random':
     default:
-      ({ whites, pb, score, explanation } = randomStrategy(config));
+      ({ whites, pb, score, explanation } = randomStrategy(config, rng));
       break;
   }
 
   // Apply distribution filters for quality
-  const finalScore = adjustScore(whites, pb, analysis, score, config);
+  const qualityScore = adjustScore(whites, pb, analysis, score, config);
+  const backtest = backtestPrediction(whites, pb, draws);
+  const finalScore = applyBacktestScoreBoost(qualityScore, backtest);
 
   return {
     id: generateId(),
@@ -53,6 +56,7 @@ export function generatePrediction(
     powerball: pb,
     mode,
     score: finalScore,
+    backtest,
     explanation,
     createdAt: new Date().toISOString(),
   };
@@ -71,7 +75,8 @@ export function generateAllPredictions(draws: Draw[], game: GameType = 'powerbal
 function hotStrategy(
   all: AnalysisResult,
   recent: AnalysisResult,
-  config: GameConfig
+  config: GameConfig,
+  rng: () => number
 ): { whites: number[]; pb: number; score: number; explanation: string } {
   // Weight recent frequency x2 + all-time x1
   const scored = all.whiteFrequency.map((f) => {
@@ -85,7 +90,7 @@ function hotStrategy(
 
   // Pick top 15, then randomly select 5 (adds variation)
   const pool = scored.slice(0, 15).map((s) => s.number);
-  const whites = pickRandom(pool, config.whiteCount);
+  const whites = pickRandom(pool, config.whiteCount, rng);
 
   // Powerball: pick from top hot
   const pbScored = all.powerballFrequency
@@ -94,7 +99,7 @@ function hotStrategy(
       return { number: f.number, score: f.percentage + (recentF?.percentage || 0) * 2 };
     })
     .sort((a, b) => b.score - a.score);
-  const pb = pbScored[Math.floor(Math.random() * 5)].number;
+  const pb = pbScored[Math.floor(rng() * Math.min(5, pbScored.length))].number;
 
   return {
     whites,
@@ -107,7 +112,8 @@ function hotStrategy(
 function coldStrategy(
   all: AnalysisResult,
   recent: AnalysisResult,
-  config: GameConfig
+  config: GameConfig,
+  rng: () => number
 ): { whites: number[]; pb: number; score: number; explanation: string } {
   // Numbers overdue + low recent frequency
   const scored = all.whiteFrequency.map((f) => ({
@@ -117,12 +123,12 @@ function coldStrategy(
   scored.sort((a, b) => b.score - a.score);
 
   const pool = scored.slice(0, 15).map((s) => s.number);
-  const whites = pickRandom(pool, config.whiteCount);
+  const whites = pickRandom(pool, config.whiteCount, rng);
 
   const pbScored = all.powerballFrequency
     .map((f) => ({ number: f.number, score: f.lastSeen }))
     .sort((a, b) => b.score - a.score);
-  const pb = pbScored[Math.floor(Math.random() * 5)].number;
+  const pb = pbScored[Math.floor(rng() * Math.min(5, pbScored.length))].number;
 
   return {
     whites,
@@ -135,7 +141,8 @@ function coldStrategy(
 function balancedStrategy(
   all: AnalysisResult,
   recent: AnalysisResult,
-  config: GameConfig
+  config: GameConfig,
+  rng: () => number
 ): { whites: number[]; pb: number; score: number; explanation: string } {
   // Mix: 2 hot + 2 cold + 1 medium
   const sorted = [...all.whiteFrequency].sort((a, b) => b.count - a.count);
@@ -144,15 +151,15 @@ function balancedStrategy(
   const mid = sorted.slice(25, 45).map((f) => f.number);
 
   const whites = [
-    ...pickRandom(hot, 2),
-    ...pickRandom(cold, 2),
-    ...pickRandom(mid, 1),
+    ...pickRandom(hot, 2, rng),
+    ...pickRandom(cold, 2, rng),
+    ...pickRandom(mid, 1, rng),
   ];
 
   // Ensure no duplicates
-  const deduped = ensureUnique(whites, config.whiteCount, config.whiteMax);
+  const deduped = ensureUnique(whites, config.whiteCount, config.whiteMax, rng);
 
-  const pb = Math.floor(Math.random() * config.bonusMax) + 1;
+  const pb = Math.floor(rng() * config.bonusMax) + 1;
 
   return {
     whites: deduped,
@@ -164,7 +171,8 @@ function balancedStrategy(
 
 function antiCrowdStrategy(
   all: AnalysisResult,
-  config: GameConfig
+  config: GameConfig,
+  rng: () => number
 ): { whites: number[]; pb: number; score: number; explanation: string } {
   // Avoid "popular" patterns people commonly pick:
   // - Birthday numbers (1-31)
@@ -183,14 +191,15 @@ function antiCrowdStrategy(
   // Allow 1 popular number for variety
   const popular = pickRandom(
     Array.from(popularNumbers).filter((n) => n <= config.whiteMax),
-    1
+    1,
+    rng
   );
-  const unpopular = pickRandom(unpopularPool, 4);
+  const unpopular = pickRandom(unpopularPool, 4, rng);
   const whites = [...popular, ...unpopular];
 
   // Prefer higher bonus numbers (less popular)
   const highStart = Math.max(1, config.bonusMax - 9);
-  const pb = Math.floor(Math.random() * (config.bonusMax - highStart + 1)) + highStart;
+  const pb = Math.floor(rng() * (config.bonusMax - highStart + 1)) + highStart;
 
   return {
     whites,
@@ -200,7 +209,7 @@ function antiCrowdStrategy(
   };
 }
 
-function randomStrategy(config: GameConfig): {
+function randomStrategy(config: GameConfig, rng: () => number): {
   whites: number[];
   pb: number;
   score: number;
@@ -208,10 +217,10 @@ function randomStrategy(config: GameConfig): {
 } {
   const whites: number[] = [];
   while (whites.length < config.whiteCount) {
-    const n = Math.floor(Math.random() * config.whiteMax) + 1;
+    const n = Math.floor(rng() * config.whiteMax) + 1;
     if (!whites.includes(n)) whites.push(n);
   }
-  const pb = Math.floor(Math.random() * config.bonusMax) + 1;
+  const pb = Math.floor(rng() * config.bonusMax) + 1;
 
   return {
     whites,
@@ -223,15 +232,15 @@ function randomStrategy(config: GameConfig): {
 
 // ---- Utility Functions ----
 
-function pickRandom(arr: number[], count: number): number[] {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+function pickRandom(arr: number[], count: number, rng: () => number): number[] {
+  const shuffled = [...arr].sort(() => rng() - 0.5);
   return shuffled.slice(0, count);
 }
 
-function ensureUnique(numbers: number[], targetCount: number, max: number): number[] {
+function ensureUnique(numbers: number[], targetCount: number, max: number, rng: () => number): number[] {
   const unique = [...new Set(numbers)];
   while (unique.length < targetCount) {
-    const n = Math.floor(Math.random() * max) + 1;
+    const n = Math.floor(rng() * max) + 1;
     if (!unique.includes(n)) unique.push(n);
   }
   return unique.slice(0, targetCount);
@@ -324,7 +333,8 @@ export function extractNumbersFromDate(dateStr: string, whiteMax: number): numbe
 function luckyDatesStrategy(
   luckyDates: LuckyDate[],
   all: AnalysisResult,
-  config: GameConfig
+  config: GameConfig,
+  rng: () => number
 ): { whites: number[]; pb: number; score: number; explanation: string } {
   // Build weighted pool: each lucky number repeated by its weight
   const weightedPool: number[] = [];
@@ -342,7 +352,7 @@ function luckyDatesStrategy(
   const combined = [...weightedPool, ...basePool];
 
   // Shuffle and pick first 5 unique valid numbers
-  const shuffled = combined.slice().sort(() => Math.random() - 0.5);
+  const shuffled = combined.slice().sort(() => rng() - 0.5);
   const whites: number[] = [];
   for (const n of shuffled) {
     if (n >= 1 && n <= config.whiteMax && !whites.includes(n)) {
@@ -352,11 +362,11 @@ function luckyDatesStrategy(
   }
   // Fill any remaining slots with random numbers
   while (whites.length < config.whiteCount) {
-    const n = Math.floor(Math.random() * config.whiteMax) + 1;
+    const n = Math.floor(rng() * config.whiteMax) + 1;
     if (!whites.includes(n)) whites.push(n);
   }
 
-  const pb = Math.floor(Math.random() * config.bonusMax) + 1;
+  const pb = Math.floor(rng() * config.bonusMax) + 1;
   const labels = luckyDates.map((ld) => ld.label).join(', ');
 
   return {
@@ -377,8 +387,11 @@ export function generateLuckyDatesPrediction(
 ): PredictionSet {
   const config = getGameConfig(game);
   const analysis = analyzeDraws(draws, 'prediction', config);
-  const { whites, pb, score, explanation } = luckyDatesStrategy(luckyDates, analysis, config);
-  const finalScore = adjustScore(whites, pb, analysis, score, config);
+  const rng = createSeededRng(`${game}:lucky:${draws.length}:${luckyDates.map((d) => d.date).join('|')}`);
+  const { whites, pb, score, explanation } = luckyDatesStrategy(luckyDates, analysis, config, rng);
+  const qualityScore = adjustScore(whites, pb, analysis, score, config);
+  const backtest = backtestPrediction(whites, pb, draws);
+  const finalScore = applyBacktestScoreBoost(qualityScore, backtest);
 
   return {
     id: generateId(),
@@ -387,6 +400,7 @@ export function generateLuckyDatesPrediction(
     powerball: pb,
     mode: 'lucky',
     score: finalScore,
+    backtest,
     explanation,
     createdAt: new Date().toISOString(),
   };
@@ -445,4 +459,68 @@ export function monteCarloScore(
   }
 
   return { matchDistribution: matchDist, expectedValue: ev };
+}
+
+function createSeededRng(seedInput: string): () => number {
+  let state = hashString(seedInput) || 1;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    const normalized = (state >>> 0) / 4294967296;
+    return normalized;
+  };
+}
+
+function hashString(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function backtestPrediction(whites: number[], powerball: number, draws: Draw[]) {
+  const recent = draws.slice(0, 120);
+  if (recent.length === 0) {
+    return {
+      sampleSize: 0,
+      avgWhiteMatches: 0,
+      powerballHitRate: 0,
+      tier3PlusRate: 0,
+    };
+  }
+
+  const whiteSet = new Set(whites);
+  let totalWhiteMatches = 0;
+  let pbHits = 0;
+  let tier3Plus = 0;
+
+  for (const draw of recent) {
+    const drawWhites = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5];
+    const whiteMatches = drawWhites.filter((n) => whiteSet.has(n)).length;
+    const pbMatch = draw.powerball === powerball;
+    totalWhiteMatches += whiteMatches;
+    if (pbMatch) pbHits++;
+    if (whiteMatches >= 3 || (whiteMatches >= 2 && pbMatch)) tier3Plus++;
+  }
+
+  return {
+    sampleSize: recent.length,
+    avgWhiteMatches: totalWhiteMatches / recent.length,
+    powerballHitRate: pbHits / recent.length,
+    tier3PlusRate: tier3Plus / recent.length,
+  };
+}
+
+function applyBacktestScoreBoost(
+  baseScore: number,
+  backtest: { avgWhiteMatches: number; powerballHitRate: number; tier3PlusRate: number }
+): number {
+  let adjusted = baseScore;
+  adjusted += Math.min(8, backtest.avgWhiteMatches * 3);
+  adjusted += Math.min(5, backtest.powerballHitRate * 50);
+  adjusted += Math.min(5, backtest.tier3PlusRate * 100);
+  return Math.min(100, Math.round(adjusted));
 }

@@ -18,6 +18,7 @@ export interface GameConfig {
   multiplierLabel: string;   // "Power Play" or "Megaplier"
   accentColor: string;
   apiUrl: string;
+  officialApiUrls: string[];
   dbTable: string;
   lowHighSplit: number;      // boundary for low/high analysis
 }
@@ -71,6 +72,12 @@ export interface PredictionSet {
   powerball: number; // bonus ball
   mode: PredictionMode;
   score: number; // 0-100 confidence/quality score
+  backtest?: {
+    sampleSize: number;
+    avgWhiteMatches: number;
+    powerballHitRate: number;
+    tier3PlusRate: number;
+  };
   explanation: string;
   createdAt: string;
 }
