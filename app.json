@@ -39,7 +39,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/icon-lottodream.png",
+      "favicon": "./assets/favicon.png",
       "bundlingEngine": "metro"
     },
     "plugins": [

@@ -1,7 +1,7 @@
 // ============================================
 // Web Landing Page – marketing-style website
 // ============================================
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
+import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
 
 interface Props {
   onLogin: () => void;
@@ -47,6 +48,31 @@ const STICKY_NAV_OFFSET = 88;
 const POWERBALL_LOGO = require('../../assets/powerball-logo.png');
 const MEGA_MILLIONS_LOGO = require('../../assets/mega-millions-logo.png');
 
+/** Mon, Wed, Sat (JS getDay: 0 Sun … 6 Sat) */
+const POWERBALL_DRAW_DAYS = [1, 3, 6];
+/** Tue, Fri */
+const MEGA_DRAW_DAYS = [2, 5];
+
+function formatWeekdayShortDate(d: Date): string {
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function nextScheduledDrawOnOrAfter(from: Date, weekdays: number[]): Date {
+  const start = new Date(from);
+  start.setHours(12, 0, 0, 0);
+  for (let add = 0; add < 21; add++) {
+    const t = new Date(start);
+    t.setDate(start.getDate() + add);
+    if (weekdays.includes(t.getDay())) return t;
+  }
+  return start;
+}
+
 export function WebLandingPage({ onLogin, onRegister }: Props) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -56,6 +82,25 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
   const [sectionY, setSectionY] = useState({ features: 0, howItWorks: 0, supportedGames: 0 });
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [landingJackpots, setLandingJackpots] = useState<{
+    powerball: LandingJackpotDisplay | null;
+    megamillions: LandingJackpotDisplay | null;
+  }>({ powerball: null, megamillions: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const j = await fetchLandingGameJackpots();
+        if (!cancelled) setLandingJackpots(j);
+      } catch {
+        if (!cancelled) setLandingJackpots({ powerball: null, megamillions: null });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scrollToSection = (sectionKey: 'features' | 'howItWorks' | 'supportedGames') => {
     const yOffset = Math.max(sectionY[sectionKey] - STICKY_NAV_OFFSET, 0);
@@ -74,38 +119,42 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       ref={scrollViewRef}
       stickyHeaderIndices={[0]}
     >
-      {/* ── Navbar ── */}
+      {/* ── Navbar: full-width white band; logo & links capped at 1280 like main column ── */}
       <View style={styles.navShell}>
-        <View style={[styles.nav, isWide && styles.navWide, { paddingTop: 20 + insets.top }]}>
-          <View style={styles.navLogoWrap}>
-            <LottoDreamLogo width={200} />
-          </View>
-          {isWide ? (
-            <View style={styles.navLinks}>
-              <TouchableOpacity onPress={() => scrollToSection('features')}>
-                <Text style={styles.navLink}>Features</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => scrollToSection('howItWorks')}>
-                <Text style={styles.navLink}>How It Works</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => scrollToSection('supportedGames')}>
-                <Text style={styles.navLink}>Supported Games</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.navLoginBtn, { backgroundColor: hoveredButton === 'navSignIn' ? 'rgba(113, 128, 150, 0.15)' : 'rgba(113, 128, 150, 0.08)' }]}
-                {...({ onMouseEnter: () => setHoveredButton('navSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
-                onPress={onLogin}
-              >
-                <Text style={styles.navLoginText}>Sign In</Text>
-              </TouchableOpacity>
+        <View style={styles.navBand}>
+          <View style={styles.navInner}>
+            <View style={[styles.nav, isWide && styles.navWide, { paddingTop: 20 + insets.top }]}>
+              <View style={styles.navLogoWrap}>
+                <LottoDreamLogo width={200} />
+              </View>
+              {isWide ? (
+                <View style={styles.navLinks}>
+                  <TouchableOpacity onPress={() => scrollToSection('features')}>
+                    <Text style={styles.navLink}>Features</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => scrollToSection('howItWorks')}>
+                    <Text style={styles.navLink}>How It Works</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => scrollToSection('supportedGames')}>
+                    <Text style={styles.navLink}>Supported Games</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.navLoginBtn, { backgroundColor: hoveredButton === 'navSignIn' ? 'rgba(113, 128, 150, 0.15)' : 'rgba(113, 128, 150, 0.08)' }]}
+                    {...({ onMouseEnter: () => setHoveredButton('navSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
+                    onPress={onLogin}
+                  >
+                    <Text style={styles.navLoginText}>Sign In</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.hamburger} onPress={() => setMenuOpen(v => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <View style={[styles.hamburgerBar, styles.hamburgerBarTop, menuOpen && styles.hamburgerBarTopOpen]} />
+                  <View style={[styles.hamburgerBar, styles.hamburgerBarMid, menuOpen && styles.hamburgerBarMidOpen]} />
+                  <View style={[styles.hamburgerBar, styles.hamburgerBarBot, menuOpen && styles.hamburgerBarBotOpen]} />
+                </TouchableOpacity>
+              )}
             </View>
-          ) : (
-            <TouchableOpacity style={styles.hamburger} onPress={() => setMenuOpen(v => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={[styles.hamburgerBar, styles.hamburgerBarTop, menuOpen && styles.hamburgerBarTopOpen]} />
-              <View style={[styles.hamburgerBar, styles.hamburgerBarMid, menuOpen && styles.hamburgerBarMidOpen]} />
-              <View style={[styles.hamburgerBar, styles.hamburgerBarBot, menuOpen && styles.hamburgerBarBotOpen]} />
-            </TouchableOpacity>
-          )}
+          </View>
         </View>
         {/* ── Mobile Drawer Overlay ── */}
         {!isWide && menuOpen && (
@@ -141,7 +190,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         </Text>
         <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
           Analyze Powerball & Mega Millions draw history, discover hot/cold patterns,
-          and generate AI-powered number picks - all in one place.
+          and generate AI-powered number picks — all in one place.
         </Text>
         <View style={[styles.heroCtas, isWide && styles.heroCtasWide]}>
           <TouchableOpacity
@@ -198,9 +247,9 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           </View>
       </View>
 
-      {/* ── How It Works ── */}
-      <View 
-        style={[styles.section, styles.sectionAlt, isWide && styles.sectionWide]}
+      {/* ── How It Works (full-bleed gray band on web) ── */}
+      <View
+        style={styles.howItWorksBand}
         onLayout={(event) => {
           setSectionY((prev) => ({
             ...prev,
@@ -208,17 +257,27 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           }));
         }}
       >
-        <Text style={styles.sectionTitle}>How It Works</Text>
-        <View style={[styles.stepsRow, isWide && styles.stepsRowWide]}>
-          {STEPS.map((s, i) => (
-            <View key={i} style={[styles.stepCard, isWide && styles.stepCardWide]}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepNum}>{i + 1}</Text>
+        <View style={[styles.section, isWide && styles.sectionWide]}>
+          <Text style={[styles.sectionTitle, styles.howItWorksTitle]}>How It Works</Text>
+          <Text style={[styles.sectionSub, styles.howItWorksSub]}>
+            Four steps from sign up to your first personalized number set.
+          </Text>
+
+          <View style={[styles.stepsRow, isWide && styles.stepsRowWide]}>
+            {STEPS.map((s, i) => (
+              <View key={i} style={[styles.stepCard, isWide && styles.stepCardWide]}>
+                <View style={[styles.stepBadgeRow, isWide && styles.stepBadgeRowWide]}>
+                  {isWide && <View style={[styles.stepHLine, i === 0 && styles.stepHLineHidden]} />}
+                  <View style={styles.stepBadge}>
+                    <Text style={styles.stepNum}>{i + 1}</Text>
+                  </View>
+                  {isWide && <View style={[styles.stepHLine, i === STEPS.length - 1 && styles.stepHLineHidden]} />}
+                </View>
+                <Text style={[styles.stepTitle, isWide && styles.stepTitleWide]}>{s.title}</Text>
+                <Text style={[styles.stepDesc, isWide && styles.stepDescWide]}>{s.desc}</Text>
               </View>
-              <Text style={styles.stepTitle}>{s.title}</Text>
-              <Text style={styles.stepDesc}>{s.desc}</Text>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       </View>
 
@@ -234,16 +293,36 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       >
         <Text style={[styles.sectionTitle, styles.supportedGamesTitle]}>Supported Games</Text>
         <View style={[styles.gamesRow, isWide && styles.gamesRowWide]}>
-          <View style={[styles.gameCard, isWide && styles.gameCardWide, { borderColor: '#E53E3E' }]}>
+          <View style={[styles.gameCard, isWide && styles.gameCardWide]}>
             <Image source={POWERBALL_LOGO} style={styles.gameLogoPowerball} />
+            <Text style={styles.gameResultPrimary}>
+              {landingJackpots.powerball?.amountDisplay ?? '—'}
+            </Text>
+            <Text style={styles.gameResultMeta}>
+              Next drawing:{' '}
+              {formatWeekdayShortDate(
+                landingJackpots.powerball?.nextDrawDate ??
+                  nextScheduledDrawOnOrAfter(new Date(), POWERBALL_DRAW_DAYS)
+              )}
+            </Text>
             <Text style={styles.gameTitle}>Powerball</Text>
             <Text style={styles.gameDesc}>
               5 white balls (1-69) + 1 Powerball (1-26){'\n'}
               Draws: Mon, Wed, Sat
             </Text>
           </View>
-          <View style={[styles.gameCard, isWide && styles.gameCardWide, { borderColor: '#D69E2E' }]}>
+          <View style={[styles.gameCard, isWide && styles.gameCardWide]}>
             <Image source={MEGA_MILLIONS_LOGO} style={styles.gameLogoMegaMillions} />
+            <Text style={styles.gameResultPrimary}>
+              {landingJackpots.megamillions?.amountDisplay ?? '—'}
+            </Text>
+            <Text style={styles.gameResultMeta}>
+              Next drawing:{' '}
+              {formatWeekdayShortDate(
+                landingJackpots.megamillions?.nextDrawDate ??
+                  nextScheduledDrawOnOrAfter(new Date(), MEGA_DRAW_DAYS)
+              )}
+            </Text>
             <Text style={styles.gameTitle}>Mega Millions</Text>
             <Text style={styles.gameDesc}>
               5 white balls (1-70) + 1 Mega Ball (1-25){'\n'}
@@ -290,15 +369,17 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Footer ── */}
-      <View style={styles.footer}>
-        <LottoDreamLogo width={150} />
-        <Text style={styles.footerText}>
-          Data sourced from NY Open Data  •  Updated after every drawing
-        </Text>
-        <Text style={styles.footerText}>
-          © {new Date().getFullYear()} LottoDream. All rights reserved.
-        </Text>
+      {/* ── Footer: full-width band & border; content max 1280 ── */}
+      <View style={styles.footerBand}>
+        <View style={styles.footerInner}>
+          <LottoDreamLogo width={150} />
+          <Text style={styles.footerText}>
+            Data sourced from NY Open Data  •  Updated after every drawing
+          </Text>
+          <Text style={styles.footerText}>
+            © {new Date().getFullYear()} LottoDream. All rights reserved.
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -342,19 +423,19 @@ const FEATURES = [
 const STEPS = [
   {
     title: 'Create Account',
-    desc: 'Sign up for free in 30 seconds. No credit card needed.',
+    desc: 'Register in seconds and get immediate access to the web dashboard and analytics tools.',
   },
   {
-    title: 'Explore & Analyze',
-    desc: 'View draw history, frequency analysis, and hot/cold number trends.',
+    title: 'Analyze Numbers',
+    desc: 'Explore hot/cold trends, draw history, and AI-generated predictions at a glance.',
   },
   {
-    title: 'Get Smart Picks',
-    desc: 'Generate AI-powered number combinations using 5 different strategies.',
+    title: 'Build Your Picks',
+    desc: 'Use lucky dates, balanced analytics, or AI suggestions to create number combinations.',
   },
   {
     title: 'Save & Play',
-    desc: 'Save your favorite picks or build a Lucky Dates combo from meaningful numbers. Track your sets anytime.',
+    desc: 'Keep your favorite picks, review live results, and adjust your strategy.',
   },
 ];
 
@@ -369,13 +450,29 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 30,
   },
+  navBand: Platform.select({
+    web: {
+      backgroundColor: '#FFFFFF',
+      width: '100vw' as any,
+      marginLeft: 'calc(50% - 50vw)' as any,
+    } as any,
+    default: {
+      backgroundColor: '#FFFFFF',
+      width: '100%' as any,
+      alignSelf: 'stretch' as any,
+    },
+  }),
+  navInner: {
+    maxWidth: 1280,
+    width: '100%' as any,
+    alignSelf: 'center' as any,
+  },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
     flexWrap: 'nowrap',
     gap: 12,
     zIndex: 20,
@@ -543,7 +640,19 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: 20, paddingVertical: 76 },
   featuresSection: { marginBottom: 50 },
   sectionWide: { paddingHorizontal: 40, alignItems: 'center' as any },
-  sectionAlt: { backgroundColor: '#F8FAFC' },
+  /** Gray band edge-to-edge on web despite scroll content maxWidth */
+  howItWorksBand: Platform.select({
+    web: {
+      backgroundColor: '#F8FAFC',
+      width: '100vw' as any,
+      marginLeft: 'calc(50% - 50vw)' as any,
+    } as any,
+    default: {
+      backgroundColor: '#F8FAFC',
+      width: '100%' as any,
+      alignSelf: 'stretch' as any,
+    },
+  }),
   sectionTitle: {
     fontSize: 28,
     fontWeight: '500',
@@ -561,6 +670,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center' as any,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  howItWorksTitle: { fontWeight: '600' },
+  howItWorksSub: { marginBottom: 40, maxWidth: 520 },
 
   /* Feature Cards */
   featureGrid: { gap: 16, width: '100%' },
@@ -588,39 +699,84 @@ const styles = StyleSheet.create({
   featureTitle: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 6, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   featureDesc: { fontSize: 13, color: '#475569', lineHeight: 20, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
-  /* Steps */
-  stepsRow: { gap: 16, width: '100%' },
+  /* Steps — timeline (wide) / stacked (narrow) */
+  stepsRow: { gap: 28, width: '100%', maxWidth: 960, alignSelf: 'center' as any },
   stepsRowWide: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    maxWidth: 960,
-    gap: 24,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    gap: 0,
+    width: '100%' as any,
   },
   stepCard: {
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     width: '100%',
   },
-  stepCardWide: { width: 200, flexGrow: 0 },
-  stepBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3182CE',
-    justifyContent: 'center',
+  stepCardWide: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 0,
+  },
+  stepBadgeRow: {
     alignItems: 'center',
     marginBottom: 14,
   },
-  stepNum: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  stepBadgeRowWide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  stepHLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#E2E8F0',
+    minWidth: 0,
+  },
+  stepHLineHidden: {
+    backgroundColor: 'transparent',
+  },
+  stepBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  stepNum: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   stepTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 6,
+    marginBottom: 8,
     textAlign: 'center',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  stepDesc: { fontSize: 13, color: '#475569', textAlign: 'center', lineHeight: 19, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  stepTitleWide: {
+    maxWidth: 190,
+    alignSelf: 'center' as any,
+  },
+  stepDesc: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  stepDescWide: {
+    maxWidth: 190,
+    alignSelf: 'center' as any,
+  },
 
   /* Games */
   gamesRow: { gap: 16, width: '100%' },
@@ -632,10 +788,8 @@ const styles = StyleSheet.create({
   },
   supportedGamesTitle: { marginBottom: 40 },
   gameCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
     padding: 28,
     marginVertical: 20,
     alignItems: 'center',
@@ -645,17 +799,41 @@ const styles = StyleSheet.create({
   gameLogoPowerball: {
     width: 180,
     height: 72,
-    marginBottom: 12,
+    marginBottom: 16,
     resizeMode: 'contain',
   },
   gameLogoMegaMillions: {
     width: 200,
     height: 72,
-    marginBottom: 12,
+    marginBottom: 16,
     resizeMode: 'contain',
   },
-  gameTitle: { fontSize: 22, fontWeight: '500', color: '#111827', marginBottom: 8, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  gameDesc: { fontSize: 13, color: '#475569', textAlign: 'center', lineHeight: 21, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  gameResultPrimary: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#148c74',
+    textAlign: 'center',
+    marginBottom: 6,
+    letterSpacing: 0.2,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  gameResultMeta: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 18,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  gameTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  gameDesc: { fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 21, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* CTA Banner */
   ctaBanner: {
@@ -733,13 +911,31 @@ const styles = StyleSheet.create({
   },
 
   /* Footer */
-  footer: {
+  footerBand: Platform.select({
+    web: {
+      backgroundColor: '#FFFFFF',
+      width: '100vw' as any,
+      marginLeft: 'calc(50% - 50vw)' as any,
+      marginTop: 76,
+      borderTopWidth: 1,
+      borderTopColor: '#E2E8F0',
+    } as any,
+    default: {
+      backgroundColor: '#FFFFFF',
+      width: '100%' as any,
+      alignSelf: 'stretch' as any,
+      marginTop: 76,
+      borderTopWidth: 1,
+      borderTopColor: '#E2E8F0',
+    },
+  }),
+  footerInner: {
+    maxWidth: 1280,
+    width: '100%' as any,
+    alignSelf: 'center' as any,
     alignItems: 'center',
-    marginTop: 76,
     paddingVertical: 52,
     paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
   },
   footerText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 });
