@@ -21,23 +21,26 @@ interface Props {
   onRegister: () => void;
 }
 
-const BAR_ICON_PATH =
-  'M387.2,307.43c0-.62.5-1.12,1.12-1.12h2.25c.62,0,1.12.5,1.12,1.12v6.75c0,.62-.5,1.12-1.12,1.12h-2.25c-.62,0-1.12-.5-1.12-1.12h0v-6.75ZM393.95,302.93c0-.62.5-1.12,1.12-1.12h2.25c.62,0,1.12.5,1.12,1.12v11.25c0,.62-.5,1.12-1.12,1.12h-2.25c-.62,0-1.12-.5-1.12-1.12v-11.25ZM400.7,298.43c0-.62.5-1.12,1.12-1.12h2.25c.62,0,1.12.5,1.12,1.12v15.75c0,.62-.5,1.12-1.12,1.12h-2.25c-.62,0-1.12-.5-1.12-1.12v-15.75Z';
+/** Paths from feature icons (viewBox 0 0 25.2 25.2); bar / ai / bolt / history / platform / secure */
+const FEATURE_BAR_PATH =
+  'M3.23,13.42c0-.62.5-1.12,1.12-1.12h2.25c.62,0,1.12.5,1.12,1.12v6.75c0,.62-.5,1.12-1.12,1.12h-2.25c-.62,0-1.12-.5-1.12-1.12h0v-6.75ZM9.98,8.92c0-.62.5-1.12,1.12-1.12h2.25c.62,0,1.12.5,1.12,1.12v11.25c0,.62-.5,1.12-1.12,1.12h-2.25c-.62,0-1.12-.5-1.12-1.12v-11.25ZM16.73,4.42c0-.62.5-1.12,1.12-1.12h2.25c.62,0,1.12.5,1.12,1.12v15.75c0,.62-.5,1.12-1.12,1.12h-2.25c-.62,0-1.12-.5-1.12-1.12V4.42Z';
 
-const SMART_ICON_PATH =
-  'M392.45,297.31v1.5M388.7,302.56h-1.5M405.2,302.56h-1.5M388.7,306.31h-1.5M405.2,306.31h-1.5M388.7,310.06h-1.5M405.2,310.06h-1.5M392.45,313.81v1.5M396.2,297.31v1.5M396.2,313.81v1.5M399.95,297.31v1.5M399.95,313.81v1.5M390.95,313.81h10.5c1.24,0,2.25-1.01,2.25-2.25v-10.5c0-1.24-1.01-2.25-2.25-2.25h-10.5c-1.24,0-2.25,1.01-2.25,2.25v10.5c0,1.24,1.01,2.25,2.25,2.25ZM391.7,301.81h9v9h-9v-9Z';
+const FEATURE_AI_PATH =
+  'M10.41,16.5l-.81,2.85-.81-2.85c-.43-1.49-1.6-2.66-3.09-3.09l-2.85-.81,2.85-.81c1.49-.43,2.66-1.6,3.09-3.09l.81-2.85.81,2.85c.43,1.49,1.6,2.66,3.09,3.09l2.85.81-2.85.81c-1.49.43-2.66,1.6-3.09,3.09h0ZM18.86,9.33l-.26,1.03-.26-1.03c-.3-1.21-1.25-2.15-2.45-2.46l-1.04-.26,1.04-.26c1.21-.3,2.15-1.25,2.46-2.46l.26-1.04.26,1.03c.3,1.21,1.25,2.15,2.46,2.46l1.03.26-1.03.26c-1.21.3-2.15,1.25-2.46,2.46h-.01ZM17.49,21.18l-.39,1.18-.39-1.18c-.22-.67-.75-1.2-1.42-1.42l-1.18-.39,1.18-.39c.67-.22,1.2-.75,1.42-1.42l.39-1.18.39,1.18c.22.67.75,1.2,1.42,1.42l1.18.39-1.18.39c-.67.22-1.2.75-1.42,1.42Z';
 
-const HISTORY_ICON_PATH =
-  'M387.75,306h16.5M387.75,309.75h16.5M387.75,313.5h16.5M389.62,298.5h12.75c1.04,0,1.88.84,1.88,1.88s-.84,1.88-1.88,1.88h-12.75c-1.04,0-1.88-.84-1.88-1.88s.84-1.88,1.88-1.88Z';
+const FEATURE_BOLT_PATH =
+  'M4.35,14.1L14.85,2.85l-2.25,8.25h8.25l-10.5,11.25,2.25-8.25H4.35Z';
 
-const DOLLAR_ICON_PATH =
-  'M396.2,300.31v12M393.2,309.49l.88.66c1.17.88,3.07.88,4.24,0,1.17-.88,1.17-2.3,0-3.18-.59-.44-1.35-.66-2.12-.66-.73,0-1.45-.22-2-.66-1.11-.88-1.11-2.3,0-3.18s2.9-.88,4.01,0l.41.33M405.2,306.31c0,4.97-4.03,9-9,9s-9-4.03-9-9,4.03-9,9-9,9,4.03,9,9Z';
+const FEATURE_HISTORY_PATH =
+  'M9.6,12.28h3.75M9.6,15.28h3.75M9.6,18.28h3.75M16.35,19.03h2.25c1.24,0,2.25-1.01,2.25-2.25V6.39c0-1.14-.84-2.1-1.98-2.19-.37-.03-.75-.06-1.12-.08M11.95,4.11c-.06.21-.1.43-.1.66,0,.41.34.75.75.75h4.5c.41,0,.75-.34.75-.75,0-.23-.03-.45-.1-.66M11.95,4.11c.29-.94,1.16-1.59,2.15-1.59h1.5c1.01,0,1.87.67,2.15,1.59M11.95,4.11c-.38.02-.75.05-1.12.08-1.13.09-1.98,1.06-1.98,2.19v2.14M8.85,8.53h-3.38c-.62,0-1.12.5-1.12,1.12v11.25c0,.62.5,1.12,1.12,1.12h9.75c.62,0,1.12-.5,1.12-1.12v-11.25c0-.62-.5-1.12-1.12-1.12h-6.38.01ZM7.35,12.28h0ZM7.35,15.28h0ZM7.35,18.28h0Z';
 
-const PLATFORM_ICON_PATH =
-  'M390.43,303.75l-4.18,2.25,4.18,2.25M390.43,303.75l5.57,3,5.57-3M390.43,303.75l-4.18-2.25,9.75-5.25,9.75,5.25-4.18,2.25M401.57,303.75l4.18,2.25-4.18,2.25M401.57,308.25l4.18,2.25-9.75,5.25-9.75-5.25,4.18-2.25M401.57,308.25l-5.57,3-5.57-3';
+const FEATURE_PLATFORM_PATH =
+  'M7.03,10.35l-4.18,2.25,4.18,2.25M7.03,10.35l5.57,3,5.57-3M7.03,10.35l-4.18-2.25L12.6,2.85l9.75,5.25-4.18,2.25M18.17,10.35l4.18,2.25-4.18,2.25M18.17,14.85l4.18,2.25-9.75,5.25-9.75-5.25,4.18-2.25M18.17,14.85l-5.57,3-5.57-3';
 
-const SECURE_ICON_PATH =
-  'M393,306.71l2.25,2.25,3.75-5.25M396,296.67c-2.26,2.15-5.28,3.33-8.4,3.29-.4,1.21-.6,2.48-.6,3.75,0,5.59,3.82,10.29,9,11.62,5.18-1.33,9-6.03,9-11.62,0-1.31-.21-2.57-.6-3.75h-.15c-3.2,0-6.1-1.25-8.25-3.28Z';
+const FEATURE_SECURE_PATH =
+  'M9.19,13.33l2.66,2.23,4.65-4.96M12.6,3.27c-2.26,2.15-5.28,3.33-8.4,3.29-.4,1.21-.6,2.48-.6,3.75,0,5.59,3.82,10.29,9,11.62,5.18-1.33,9-6.03,9-11.62,0-1.31-.21-2.57-.6-3.75h-.15c-3.2,0-6.1-1.25-8.25-3.28h0Z';
+
+const FEATURE_ICON_VIEWBOX = '0 0 25.2 25.2';
 
 const FEATURE_ICON_SIZE = 32.4;
 const STICKY_NAV_OFFSET = 88;
@@ -176,22 +179,18 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           <View style={[styles.featureGrid, isWide && styles.featureGridWide]}>
             {FEATURES.map((f, i) => (
               <View key={i} style={[styles.featureCard, isWide && styles.featureCardWide]}>
-                {f.svgPath ? (
-                  <View style={styles.featureSvgWrap}>
-                    <Svg width={FEATURE_ICON_SIZE} height={FEATURE_ICON_SIZE} viewBox="386 296 20 20">
-                      <Path
-                        d={f.svgPath}
-                        fill="none"
-                        stroke="#3182CE"
-                        strokeWidth={1.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </Svg>
-                  </View>
-                ) : (
-                  <Text style={styles.featureIcon}>{f.icon}</Text>
-                )}
+                <View style={styles.featureSvgWrap}>
+                  <Svg width={FEATURE_ICON_SIZE} height={FEATURE_ICON_SIZE} viewBox={FEATURE_ICON_VIEWBOX}>
+                    <Path
+                      d={f.svgPath}
+                      fill="none"
+                      stroke="#148c74"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                </View>
                 <Text style={styles.featureTitle}>{f.title}</Text>
                 <Text style={styles.featureDesc}>{f.desc}</Text>
               </View>
@@ -309,39 +308,34 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
 
 const FEATURES = [
   {
-    icon: '📊',
     title: 'Real-time Analytics',
     desc: 'See which numbers are trending, which pairs appear most often, and where the odds are shifting.',
-    svgPath: BAR_ICON_PATH,
+    svgPath: FEATURE_BAR_PATH,
   },
   {
-    icon: '🎯',
-    title: 'AI Smart Picks',
-    desc: '5 prediction modes: Hot, Cold, Balanced, Anti-Crowd, and Random — each backed by real statistics.',
-    svgPath: SMART_ICON_PATH,
+    title: 'AI-backed Predictions',
+    desc: 'Six prediction modes by AI: Hot, Cold, Balanced, Anti-Crowd, Random, and Lucky Numbers.',
+    svgPath: FEATURE_AI_PATH,
   },
   {
-    icon: '📋',
+    title: 'Lucky Numbers',
+    desc: 'Convert birthdays, anniversaries, and special dates into number sets you can play.',
+    svgPath: FEATURE_BOLT_PATH,
+  },
+  {
     title: 'Draw History',
     desc: 'Complete draw history with search & filters. Never miss a result again.',
-    svgPath: HISTORY_ICON_PATH,
+    svgPath: FEATURE_HISTORY_PATH,
   },
   {
-    icon: '✨',
-    title: 'Lucky Dates',
-    desc: 'Pick your own lucky numbers from birthdays, anniversaries, or any special date — add weights to personalize your combo.',
-  },
-  {
-    icon: '📱',
     title: 'Cross-Platform',
     desc: 'Use on the web, iOS, or Android — your account and data sync everywhere.',
-    svgPath: PLATFORM_ICON_PATH,
+    svgPath: FEATURE_PLATFORM_PATH,
   },
   {
-    icon: '🔒',
     title: 'Secure & Private',
     desc: 'Your data is encrypted and stored securely. We never share your information.',
-    svgPath: SECURE_ICON_PATH,
+    svgPath: FEATURE_SECURE_PATH,
   },
 ];
 
@@ -591,7 +585,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureIcon: { fontSize: FEATURE_ICON_SIZE, marginBottom: 12 },
   featureTitle: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 6, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   featureDesc: { fontSize: 13, color: '#475569', lineHeight: 20, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
