@@ -10,8 +10,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 
 interface Props {
@@ -43,14 +45,16 @@ const POWERBALL_LOGO = require('../../assets/powerball-logo.png');
 const MEGA_MILLIONS_LOGO = require('../../assets/mega-millions-logo.png');
 
 export function WebLandingPage({ onLogin, onRegister }: Props) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isWide = width >= 768;
   
   const scrollViewRef = useRef<ScrollView>(null);
-  const [sectionY, setSectionY] = useState({ features: 0, howItWorks: 0 });
+  const [sectionY, setSectionY] = useState({ features: 0, howItWorks: 0, supportedGames: 0 });
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const scrollToSection = (sectionKey: 'features' | 'howItWorks') => {
+  const scrollToSection = (sectionKey: 'features' | 'howItWorks' | 'supportedGames') => {
     const yOffset = Math.max(sectionY[sectionKey] - STICKY_NAV_OFFSET, 0);
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({
@@ -68,51 +72,88 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       stickyHeaderIndices={[0]}
     >
       {/* ── Navbar ── */}
-      <View style={[styles.nav, isWide && styles.navWide]}>
-        <View style={styles.navLogoWrap}>
-          <LottoDreamLogo width={150} />
+      <View style={styles.navShell}>
+        <View style={[styles.nav, isWide && styles.navWide, { paddingTop: 20 + insets.top }]}>
+          <View style={styles.navLogoWrap}>
+            <LottoDreamLogo width={200} />
+          </View>
+          {isWide ? (
+            <View style={styles.navLinks}>
+              <TouchableOpacity onPress={() => scrollToSection('features')}>
+                <Text style={styles.navLink}>Features</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => scrollToSection('howItWorks')}>
+                <Text style={styles.navLink}>How It Works</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => scrollToSection('supportedGames')}>
+                <Text style={styles.navLink}>Supported Games</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.navLoginBtn, { backgroundColor: hoveredButton === 'navSignIn' ? 'rgba(113, 128, 150, 0.15)' : 'rgba(113, 128, 150, 0.08)' }]}
+                {...({ onMouseEnter: () => setHoveredButton('navSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
+                onPress={onLogin}
+              >
+                <Text style={styles.navLoginText}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.hamburger} onPress={() => setMenuOpen(v => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={[styles.hamburgerBar, styles.hamburgerBarTop, menuOpen && styles.hamburgerBarTopOpen]} />
+              <View style={[styles.hamburgerBar, styles.hamburgerBarMid, menuOpen && styles.hamburgerBarMidOpen]} />
+              <View style={[styles.hamburgerBar, styles.hamburgerBarBot, menuOpen && styles.hamburgerBarBotOpen]} />
+            </TouchableOpacity>
+          )}
         </View>
-        <View style={styles.navLinks}>
-          <TouchableOpacity onPress={() => scrollToSection('features')}>
-            <Text style={styles.navLink}>Features</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => scrollToSection('howItWorks')}>
-            <Text style={styles.navLink}>How It Works</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.navLoginBtn, { backgroundColor: hoveredButton === 'navSignIn' ? 'rgba(113, 128, 150, 0.15)' : 'rgba(113, 128, 150, 0.08)' }]} 
-            {...({ onMouseEnter: () => setHoveredButton('navSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
-            onPress={onLogin}
-          >
-            <Text style={styles.navLoginText}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ── Mobile Drawer Overlay ── */}
+        {!isWide && menuOpen && (
+          <View style={styles.mobileOverlay}>
+            <TouchableOpacity
+              style={[styles.mobileOverlayBackdrop, { height }]}
+              activeOpacity={1}
+              onPress={() => setMenuOpen(false)}
+            />
+            <View style={styles.mobileDrawer}>
+              <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('features'); setMenuOpen(false); }}>
+                <Text style={styles.mobileDrawerText}>Features</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('howItWorks'); setMenuOpen(false); }}>
+                <Text style={styles.mobileDrawerText}>How It Works</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('supportedGames'); setMenuOpen(false); }}>
+                <Text style={styles.mobileDrawerText}>Supported Games</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mobileDrawerSignIn} onPress={() => { onLogin(); setMenuOpen(false); }}>
+                <Text style={styles.mobileDrawerSignInText}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* ── Hero ── */}
       <View style={[styles.hero, isWide && styles.heroWide]}>
-        <Text style={styles.heroEmoji}>🎯</Text>
         <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]}>
-          Smart Lottery Analysis{'\n'}Powered by AI
+          Smarter Lottery Picks{`\n`}
+          <Text style={styles.heroTitleAccent}>Powered by AI</Text>
         </Text>
         <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
           Analyze Powerball & Mega Millions draw history, discover hot/cold patterns,
-          and generate AI-powered number picks — all in one place.
+          and generate AI-powered number picks - all in one place.
         </Text>
         <View style={[styles.heroCtas, isWide && styles.heroCtasWide]}>
-          <TouchableOpacity 
-            style={[styles.ctaPrimary, { backgroundColor: hoveredButton === 'getStarted' ? '#5BA4FF' : '#3182CE' }]}
+          <TouchableOpacity
+            activeOpacity={0.88}
+            style={[
+              styles.ctaPrimary,
+              !isWide && styles.ctaPrimaryMobile,
+              isWide && styles.ctaPrimaryWide,
+              Platform.OS === 'web' && styles.ctaPrimaryWeb,
+              { backgroundColor: hoveredButton === 'getStarted' ? '#00B896' : '#00A383' },
+            ]}
             onPress={onRegister}
             {...({ onMouseEnter: () => setHoveredButton('getStarted'), onMouseLeave: () => setHoveredButton(null) } as any)}
           >
-            <Text style={styles.ctaPrimaryText}>Get Started</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.ctaOutline, { backgroundColor: hoveredButton === 'signIn' ? 'rgba(71, 85, 105, 0.15)' : 'rgba(71, 85, 105, 0.08)' }]}
-            onPress={onLogin}
-            {...({ onMouseEnter: () => setHoveredButton('signIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
-          >
-            <Text style={styles.ctaOutlineText}>Sign In</Text>
+            <Text style={styles.ctaPrimaryText}>Getting Started</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -127,9 +168,9 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           }));
         }}
       >
-        <Text style={styles.sectionTitle}>What You Get</Text>
+        <Text style={styles.sectionTitle}>Dashboard powered Lottery Tools</Text>
         <Text style={styles.sectionSub}>
-          Everything you need to play smarter, not harder.
+        Track numbers, generate combinations, and turn lucky dates into personalized picks.
         </Text>
 
           <View style={[styles.featureGrid, isWide && styles.featureGridWide]}>
@@ -183,7 +224,15 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── Games ── */}
-      <View style={[styles.section, isWide && styles.sectionWide]}>
+      <View
+        style={[styles.section, isWide && styles.sectionWide]}
+        onLayout={(event) => {
+          setSectionY((prev) => ({
+            ...prev,
+            supportedGames: event.nativeEvent.layout.y,
+          }));
+        }}
+      >
         <Text style={[styles.sectionTitle, styles.supportedGamesTitle]}>Supported Games</Text>
         <View style={[styles.gamesRow, isWide && styles.gamesRowWide]}>
           <View style={[styles.gameCard, isWide && styles.gameCardWide, { borderColor: '#E53E3E' }]}>
@@ -244,7 +293,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
 
       {/* ── Footer ── */}
       <View style={styles.footer}>
-        <LottoDreamLogo width={138} />
+        <LottoDreamLogo width={150} />
         <Text style={styles.footerText}>
           Data sourced from NY Open Data  •  Updated after every drawing
         </Text>
@@ -261,8 +310,8 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
 const FEATURES = [
   {
     icon: '📊',
-    title: 'Deep Analysis',
-    desc: 'Frequency heatmaps, hot/cold tracking, pair analysis, odd/even ratios across all historical draws.',
+    title: 'Real-time Analytics',
+    desc: 'See which numbers are trending, which pairs appear most often, and where the odds are shifting.',
     svgPath: BAR_ICON_PATH,
   },
   {
@@ -319,29 +368,88 @@ const STEPS = [
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
-  scroll: { minHeight: '100%' as any },
+  scroll: { minHeight: '100%' as any, maxWidth: 1280, width: '100%' as any, alignSelf: 'center' as any },
 
   /* Nav */
+  navShell: {
+    position: 'relative',
+    zIndex: 30,
+  },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 12,
     zIndex: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 6,
   },
-  navWide: { paddingHorizontal: 48 },
+  navWide: { paddingHorizontal: 40 },
   navLogoWrap: { justifyContent: 'center', minHeight: 24 },
+    /* Hamburger */
+    hamburger: {
+      width: 34,
+      height: 34,
+      borderWidth: 1,
+      borderColor: '#CBD5E1',
+      borderRadius: 4,
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    hamburgerBar: {
+      width: 16,
+      height: 2,
+      borderRadius: 2,
+      backgroundColor: '#1F2937',
+      position: 'absolute',
+    },
+    hamburgerBarTop: { top: 9 },
+    hamburgerBarMid: { top: 15 },
+    hamburgerBarBot: { top: 21 },
+    hamburgerBarTopOpen: { top: 15, transform: [{ rotate: '45deg' }] },
+    hamburgerBarMidOpen: { opacity: 0 },
+    hamburgerBarBotOpen: { top: 15, transform: [{ rotate: '-45deg' }] },
+    /* Mobile Drawer */
+    mobileOverlay: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      zIndex: 40,
+    },
+    mobileOverlayBackdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.46)',
+    },
+    mobileDrawer: {
+      position: 'relative',
+      backgroundColor: '#FFFFFF',
+      borderBottomWidth: 1,
+      borderBottomColor: '#E2E8F0',
+      paddingHorizontal: 16,
+      paddingBottom: 24,
+      zIndex: 41,
+    },
+    mobileDrawerItem: {
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F1F5F9',
+    },
+    mobileDrawerText: { fontSize: 15, color: '#1F2937', fontWeight: '500' },
+    mobileDrawerSignIn: {
+      marginTop: 12,
+      paddingVertical: 12,
+      borderRadius: 8,
+      backgroundColor: '#3585c6',
+      alignItems: 'center',
+    },
+    mobileDrawerSignInText: { fontSize: 15, color: '#fff', fontWeight: '600' },
   navLinks: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   navLink: { color: '#1F2937', fontSize: 13, fontWeight: '400', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   navLoginBtn: {
@@ -357,49 +465,74 @@ const styles = StyleSheet.create({
   /* Hero */
   hero: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 56,
-    paddingBottom: 48,
+    paddingHorizontal: 8,
+    paddingTop: 88,
+    paddingBottom: 80,
   },
-  heroWide: { paddingTop: 80, paddingBottom: 64 },
-  heroEmoji: { fontSize: 104, marginBottom: 16 },
+  heroWide: { paddingTop: 112, paddingBottom: 88 },
   heroTitle: {
-    fontSize: 32,
-    fontWeight: '500',
+    fontSize: 44,
+    fontWeight: '700',
     color: '#111827',
     textAlign: 'center',
-    lineHeight: 42,
+    lineHeight: 56,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  heroTitleWide: { fontSize: 48, lineHeight: 60, fontWeight: '500' },
+  heroTitleWide: { fontSize: 60, lineHeight: 72, fontWeight: '700' },
+  heroTitleAccent: {
+    color: '#00A585',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontWeight: '700',
+  },
   heroSub: {
     fontSize: 16,
-    color: '#475569',
+    color: '#334155',
     textAlign: 'center',
-    marginTop: 16,
-    maxWidth: 560,
+    marginTop: 20,
+    maxWidth: 620,
     lineHeight: 24,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  heroSubWide: { fontSize: 18, lineHeight: 28, maxWidth: 640 },
+  heroSubWide: { fontSize: 18, lineHeight: 30, maxWidth: 680 },
   heroCtas: {
     flexDirection: 'column',
-    gap: 12,
-    marginTop: 32,
-    width: '100%',
-    maxWidth: 340,
+    marginTop: 36,
+    marginBottom: 0,
+    alignItems: 'stretch',
+    width: '100%' as any,
+    alignSelf: 'center' as any,
+    zIndex: 1,
   },
-  heroCtasWide: { flexDirection: 'row', maxWidth: 420 },
+  heroCtasWide: { alignItems: 'center', maxWidth: 600 },
   ctaPrimary: {
-    backgroundColor: '#3182CE',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    backgroundColor: '#00A383',
+    borderRadius: 9999,
+    minHeight: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
   },
-  ctaPrimaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  ctaPrimaryMobile: {
+    alignSelf: 'stretch',
+    width: '100%' as any,
+  },
+  ctaPrimaryWide: {
+    alignSelf: 'center',
+    minWidth: 220,
+  },
+  ctaPrimaryWeb: {
+    cursor: 'pointer',
+  } as any,
+  ctaPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '500',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   ctaOutline: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -413,24 +546,24 @@ const styles = StyleSheet.create({
   },
   ctaOutlineText: { color: '#111827', fontSize: 17, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   /* Section */
-  section: { paddingHorizontal: 24, paddingVertical: 48 },
+  section: { paddingHorizontal: 20, paddingVertical: 76 },
   featuresSection: { marginBottom: 50 },
-  sectionWide: { paddingHorizontal: 48, alignItems: 'center' as any },
+  sectionWide: { paddingHorizontal: 40, alignItems: 'center' as any },
   sectionAlt: { backgroundColor: '#F8FAFC' },
   sectionTitle: {
-    fontSize: 27,
+    fontSize: 28,
     fontWeight: '500',
     color: '#111827',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   sectionSub: {
     fontSize: 14,
     color: '#475569',
     textAlign: 'center',
-    marginBottom: 32,
-    maxWidth: 500,
+    marginBottom:48,
+    maxWidth: 700,
     alignSelf: 'center' as any,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
@@ -534,12 +667,14 @@ const styles = StyleSheet.create({
   /* CTA Banner */
   ctaBanner: {
     backgroundColor: '#EEF2FF',
-    margin: 24,
+    marginVertical: 40,
+    marginHorizontal: 20,
     borderRadius: 20,
-    padding: 32,
+    paddingVertical: 48,
+    paddingHorizontal: 28,
     alignItems: 'center',
   },
-  ctaBannerWide: { marginHorizontal: 48, padding: 48 },
+  ctaBannerWide: { marginHorizontal: 40, paddingVertical: 56, paddingHorizontal: 40 },
   ctaBannerTitle: {
     fontSize: 27,
     fontWeight: '500',
@@ -570,9 +705,9 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     marginTop: -6,
-    marginBottom: 24,
+    marginBottom: 44,
   },
   storeBadgesRowWide: {
     flexDirection: 'row',
@@ -607,9 +742,9 @@ const styles = StyleSheet.create({
   /* Footer */
   footer: {
     alignItems: 'center',
-    marginTop: 50,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
+    marginTop: 76,
+    paddingVertical: 52,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
