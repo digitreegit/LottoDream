@@ -47,6 +47,8 @@ const FEATURE_ICON_SIZE = 32.4;
 const STICKY_NAV_OFFSET = 88;
 const POWERBALL_LOGO = require('../../assets/powerball-logo.png');
 const MEGA_MILLIONS_LOGO = require('../../assets/mega-millions-logo.png');
+const APP_STORE_BADGE = require('../../assets/badge-appstore.png');
+const GOOGLE_PLAY_BADGE = require('../../assets/badge-googleplay.png');
 
 /** Mon, Wed, Sat (JS getDay: 0 Sun … 6 Sat) */
 const POWERBALL_DRAW_DAYS = [1, 3, 6];
@@ -258,7 +260,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         }}
       >
         <View style={[styles.section, isWide && styles.sectionWide]}>
-          <Text style={[styles.sectionTitle, styles.howItWorksTitle]}>How It Works</Text>
+          <Text style={[styles.sectionTitle]}>How It Works</Text>
           <Text style={[styles.sectionSub, styles.howItWorksSub]}>
             Four steps from sign up to your first personalized number set.
           </Text>
@@ -283,7 +285,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
 
       {/* ── Games ── */}
       <View
-        style={[styles.section, isWide && styles.sectionWide]}
+        style={[styles.section, isWide && styles.sectionWide, styles.supportedGamesSection]}
         onLayout={(event) => {
           setSectionY((prev) => ({
             ...prev,
@@ -291,7 +293,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           }));
         }}
       >
-        <Text style={[styles.sectionTitle, styles.supportedGamesTitle]}>Supported Games</Text>
+        <Text style={[styles.sectionTitle]}>Supported Games</Text>
         <View style={[styles.gamesRow, isWide && styles.gamesRowWide]}>
           <View style={[styles.gameCard, isWide && styles.gameCardWide]}>
             <Image source={POWERBALL_LOGO} style={styles.gameLogoPowerball} />
@@ -340,32 +342,38 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         <Text style={styles.ctaBannerSub}>
           Sign up now to save your picks, track results, and play with your own lucky number combos — on any device.
         </Text>
-        {/* @ts-ignore */}
-        <TouchableOpacity 
-          style={[styles.ctaBannerBtn, { backgroundColor: hoveredButton === 'ctaBanner' ? '#5BA4FF' : '#3182CE' }]}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[
+            styles.ctaPrimary,
+            !isWide && styles.ctaPrimaryMobile,
+            isWide && styles.ctaPrimaryWide,
+            Platform.OS === 'web' && styles.ctaPrimaryWeb,
+            { backgroundColor: hoveredButton === 'ctaBanner' ? '#00B896' : '#00A383' },
+          ]}
           onPress={onRegister}
           {...({ onMouseEnter: () => setHoveredButton('ctaBanner'), onMouseLeave: () => setHoveredButton(null) } as any)}
         >
-          <Text style={styles.ctaBannerBtnText}>Get Started</Text>
+          <Text style={styles.ctaPrimaryText}>Getting Started</Text>
         </TouchableOpacity>
       </View>
 
       <View style={[styles.storeBadgesRow, isWide && styles.storeBadgesRowWide]}>
-        {/* @ts-ignore */}
-        <TouchableOpacity 
-          style={[styles.storeBadge, { backgroundColor: hoveredButton === 'appStore' ? 'rgba(71, 85, 105, 0.12)' : 'rgba(71, 85, 105, 0.06)' }]}
-          {...({ onMouseEnter: () => setHoveredButton('appStore'), onMouseLeave: () => setHoveredButton(null) } as any)}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.storeBadgeHit, Platform.OS === 'web' && styles.storeBadgeHitWeb]}
+          accessibilityRole="link"
+          accessibilityLabel="Download on the App Store"
         >
-          <Text style={styles.storeBadgeSub}>Download on the</Text>
-          <Text style={styles.storeBadgeTitle}>App Store</Text>
+          <Image source={APP_STORE_BADGE} style={styles.storeBadgeImageApp} resizeMode="contain" />
         </TouchableOpacity>
-        {/* @ts-ignore */}
-        <TouchableOpacity 
-          style={[styles.storeBadge, { backgroundColor: hoveredButton === 'googlePlay' ? 'rgba(71, 85, 105, 0.12)' : 'rgba(71, 85, 105, 0.06)' }]}
-          {...({ onMouseEnter: () => setHoveredButton('googlePlay'), onMouseLeave: () => setHoveredButton(null) } as any)}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.storeBadgeHit, Platform.OS === 'web' && styles.storeBadgeHitWeb]}
+          accessibilityRole="link"
+          accessibilityLabel="Get it on Google Play"
         >
-          <Text style={styles.storeBadgeSub}>GET IT ON</Text>
-          <Text style={styles.storeBadgeTitle}>Google Play</Text>
+          <Image source={GOOGLE_PLAY_BADGE} style={styles.storeBadgeImageGoogle} resizeMode="contain" />
         </TouchableOpacity>
       </View>
 
@@ -377,7 +385,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             Data sourced from NY Open Data  •  Updated after every drawing
           </Text>
           <Text style={styles.footerText}>
-            © {new Date().getFullYear()} LottoDream. All rights reserved.
+            © {new Date().getFullYear()} Skyface, LLC. All rights reserved.
           </Text>
         </View>
       </View>
@@ -779,6 +787,8 @@ const styles = StyleSheet.create({
   },
 
   /* Games */
+  /** Tighter space before CTA: half of `section` bottom padding (76 → 38) */
+  supportedGamesSection: { paddingBottom: 38 },
   gamesRow: { gap: 16, width: '100%' },
   gamesRowWide: {
     flexDirection: 'row',
@@ -797,50 +807,51 @@ const styles = StyleSheet.create({
   },
   gameCardWide: { width: 340 },
   gameLogoPowerball: {
-    width: 180,
+    width: 220,
     height: 72,
     marginBottom: 16,
     resizeMode: 'contain',
   },
   gameLogoMegaMillions: {
-    width: 200,
+    width: 260,
     height: 72,
     marginBottom: 16,
     resizeMode: 'contain',
   },
   gameResultPrimary: {
-    fontSize: 22,
+    fontSize: 32,
     fontWeight: '700',
     color: '#148c74',
     textAlign: 'center',
+    marginTop: 12,
     marginBottom: 6,
     letterSpacing: 0.2,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   gameResultMeta: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '400',
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
     marginBottom: 18,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   gameTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '600',
     color: '#111827',
     marginBottom: 8,
     textAlign: 'center',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  gameDesc: { fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 21, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  gameDesc: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* CTA Banner */
   ctaBanner: {
-    backgroundColor: '#EEF2FF',
     marginVertical: 40,
     marginHorizontal: 20,
-    borderRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
     paddingVertical: 48,
     paddingHorizontal: 28,
     alignItems: 'center',
@@ -863,14 +874,6 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  ctaBannerBtn: {
-    backgroundColor: '#3182CE',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-  },
-  ctaBannerBtnText: { color: '#FFF', fontSize: 17, fontWeight: '600', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-
   /* Store badges */
   storeBadgesRow: {
     flexDirection: 'column',
@@ -883,31 +886,26 @@ const styles = StyleSheet.create({
   storeBadgesRowWide: {
     flexDirection: 'row',
     justifyContent: 'center',
-  },
-  storeBadge: {
-    minWidth: 180,
-    borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
     alignItems: 'center',
+    gap: 16,
   },
-  storeBadgeSub: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '400',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  storeBadgeHit: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  storeBadgeTitle: {
-    color: '#111827',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 2,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  storeBadgeHitWeb: Platform.select({
+    web: { cursor: 'pointer' } as any,
+    default: {},
+  }),
+  /** badge-appstore.png 426×142 */
+  storeBadgeImageApp: {
+    height: 50,
+    width: Math.round((50 * 426) / 142),
+  },
+  /** badge-googleplay.png 478×142 */
+  storeBadgeImageGoogle: {
+    height: 50,
+    width: Math.round((50 * 478) / 142),
   },
 
   /* Footer */
