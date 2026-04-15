@@ -176,8 +176,19 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
               <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('supportedGames'); setMenuOpen(false); }}>
                 <Text style={styles.mobileDrawerText}>Supported Games</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.mobileDrawerSignIn} onPress={() => { onLogin(); setMenuOpen(false); }}>
-                <Text style={styles.mobileDrawerSignInText}>Sign In</Text>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={[
+                  styles.ctaPrimary,
+                  styles.ctaPrimaryWide,
+                  { marginTop: 12 },
+                  Platform.OS === 'web' && styles.ctaPrimaryWeb,
+                  { backgroundColor: hoveredButton === 'mobileSignIn' ? '#00B896' : '#00A383' },
+                ]}
+                onPress={() => { onLogin(); setMenuOpen(false); }}
+                {...({ onMouseEnter: () => setHoveredButton('mobileSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
+              >
+                <Text style={styles.ctaPrimaryText}>Sign In</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -199,8 +210,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             activeOpacity={0.88}
             style={[
               styles.ctaPrimary,
-              !isWide && styles.ctaPrimaryMobile,
-              isWide && styles.ctaPrimaryWide,
+              styles.ctaPrimaryWide,
               Platform.OS === 'web' && styles.ctaPrimaryWeb,
               { backgroundColor: hoveredButton === 'getStarted' ? '#00B896' : '#00A383' },
             ]}
@@ -346,8 +356,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           activeOpacity={0.88}
           style={[
             styles.ctaPrimary,
-            !isWide && styles.ctaPrimaryMobile,
-            isWide && styles.ctaPrimaryWide,
+            styles.ctaPrimaryWide,
             Platform.OS === 'web' && styles.ctaPrimaryWeb,
             { backgroundColor: hoveredButton === 'ctaBanner' ? '#00B896' : '#00A383' },
           ]}
@@ -541,14 +550,6 @@ const styles = StyleSheet.create({
       borderBottomColor: '#F1F5F9',
     },
     mobileDrawerText: { fontSize: 15, color: '#1F2937', fontWeight: '500' },
-    mobileDrawerSignIn: {
-      marginTop: 12,
-      paddingVertical: 12,
-      borderRadius: 8,
-      backgroundColor: '#3585c6',
-      alignItems: 'center',
-    },
-    mobileDrawerSignInText: { fontSize: 15, color: '#fff', fontWeight: '600' },
   navLinks: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   navLink: { color: '#1F2937', fontSize: 13, fontWeight: '400', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   navLoginBtn: {
@@ -597,12 +598,12 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     marginTop: 36,
     marginBottom: 0,
-    alignItems: 'stretch',
+    alignItems: 'center',
     width: '100%' as any,
     alignSelf: 'center' as any,
     zIndex: 1,
   },
-  heroCtasWide: { alignItems: 'center', maxWidth: 600 },
+  heroCtasWide: { maxWidth: 600 },
   ctaPrimary: {
     backgroundColor: '#00A383',
     borderRadius: 9999,
@@ -613,10 +614,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexGrow: 0,
     flexShrink: 0,
-  },
-  ctaPrimaryMobile: {
-    alignSelf: 'stretch',
-    width: '100%' as any,
   },
   ctaPrimaryWide: {
     alignSelf: 'center',
