@@ -9,12 +9,16 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { NumberHeatmap } from '../components/NumberHeatmap';
 import { StatRow } from '../components/StatCard';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
+import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+
+const C = isWebDashboard ? webDash : nativeDash;
 
 type RangeKey = 'all' | 'last10' | 'last25' | 'last50' | 'last100';
 
@@ -44,7 +48,7 @@ export function AnalysisScreen() {
       <Text style={styles.title}>📊 Number Analysis</Text>
 
       {/* Game Selector */}
-      <GameSelector />
+      <GameSelector light={isWebDashboard} />
 
       {/* Range Selector */}
       <View style={styles.rangeSelector}>
@@ -239,16 +243,19 @@ export function AnalysisScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1426',
+    backgroundColor: C.screenBg,
   },
   content: {
-    padding: 16,
     paddingBottom: 40,
+    ...Platform.select({
+      web: { paddingHorizontal: 0, paddingTop: 12 },
+      default: { padding: 16 },
+    }),
   },
   title: {
     fontSize: 27,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: C.textPrimary,
     textAlign: 'center',
     marginVertical: 16,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -263,13 +270,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#1A2744',
+    backgroundColor: isWebDashboard ? webDash.cardBg : '#1A2744',
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   rangeActive: {
-    backgroundColor: '#3182CE',
+    backgroundColor: isWebDashboard ? webDash.accent : '#3182CE',
+    ...(isWebDashboard ? { borderColor: webDash.accent } : {}),
   },
   rangeText: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textMuted : '#A0AEC0',
     fontWeight: '600',
     fontSize: 15,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -280,27 +289,28 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     textAlign: 'center',
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   card: {
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 16,
     padding: 18,
     marginVertical: 8,
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: C.textPrimary,
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#718096',
+    color: isWebDashboard ? webDash.textSecondary : '#718096',
     marginBottom: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
@@ -314,7 +324,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   rank: {
-    color: '#718096',
+    color: isWebDashboard ? webDash.textSecondary : '#718096',
     fontSize: 13,
     width: 24,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -327,13 +337,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   numberBadgeText: {
-    color: '#FFFFFF',
+    color: isWebDashboard ? webDash.textPrimary : '#FFFFFF',
     fontWeight: '700',
     fontSize: 15,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   freq: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 14,
     width: 96,
     minWidth: 96,
@@ -345,7 +355,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#2D3748',
+    backgroundColor: isWebDashboard ? '#E2E8F0' : '#2D3748',
     overflow: 'hidden',
   },
   bar: {
@@ -382,10 +392,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#2D3748',
+    borderBottomColor: C.rowBorder,
   },
   pairCount: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',

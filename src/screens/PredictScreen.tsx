@@ -18,6 +18,11 @@ import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
+import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
+
+const W = isWebDashboard;
+const C = W ? webDash : nativeDash;
 import { generatePrediction, generateAllPredictions, generateLuckyDatesPrediction, extractNumbersFromDate } from '../services/predictionEngine';
 import { savePredictionSet } from '../services/ticketService';
 import { PredictionSet, PredictionMode, LuckyDate } from '../types';
@@ -221,7 +226,7 @@ export function PredictScreen() {
       </Text>
 
       {/* Game Selector */}
-      <GameSelector />
+      <GameSelector light={isWebDashboard} />
 
       {/* Mode Selector */}
       <View style={styles.modeGrid}>
@@ -284,14 +289,14 @@ export function PredictScreen() {
               <TextInput
                 style={styles.luckyInput}
                 placeholder="이름 (예: 생일, 결혼기념일)"
-                placeholderTextColor="#4A5568"
+                placeholderTextColor={W ? '#94A3B8' : '#4A5568'}
                 value={newLabel}
                 onChangeText={setNewLabel}
               />
               <TextInput
                 style={styles.luckyInput}
                 placeholder="날짜: YYYY-MM-DD"
-                placeholderTextColor="#4A5568"
+                placeholderTextColor={W ? '#94A3B8' : '#4A5568'}
                 value={newDate}
                 onChangeText={setNewDate}
                 keyboardType="numbers-and-punctuation"
@@ -486,23 +491,26 @@ export function PredictScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1426',
+    backgroundColor: C.screenBg,
   },
   content: {
-    padding: 16,
     paddingBottom: 40,
+    ...Platform.select({
+      web: { paddingHorizontal: 0, paddingTop: 12 },
+      default: { padding: 16 },
+    }),
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: C.textPrimary,
     textAlign: 'center',
     marginTop: 16,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   subtitle: {
     fontSize: 13,
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 18,
@@ -517,45 +525,48 @@ const styles = StyleSheet.create({
   },
   modeCard: {
     width: '47%',
-    backgroundColor: '#1A2744',
+    backgroundColor: W ? webDash.cardBg : '#1A2744',
     borderRadius: 14,
     padding: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2D3748',
+    borderColor: W ? webDash.cardBorder : '#2D3748',
   },
   modeCardActive: {
-    borderColor: '#3182CE',
-    backgroundColor: '#1E3A5F',
+    borderColor: W ? webDash.accent : '#3182CE',
+    backgroundColor: W ? 'rgba(0, 163, 131, 0.12)' : '#1E3A5F',
   },
   modeIcon: {
     fontSize: 28,
     marginBottom: 6,
   },
   modeLabel: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontWeight: '700',
     fontSize: 14,
     marginBottom: 4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   modeLabelActive: {
-    color: '#63B3ED',
+    color: W ? webDash.accent : '#63B3ED',
   },
   modeDesc: {
-    color: '#718096',
+    color: W ? webDash.textMuted : '#718096',
     fontSize: 11,
     textAlign: 'center',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   generateButton: {
-    backgroundColor: '#38A169',
-    borderRadius: 14,
+    ...(W ? landingCtaPrimaryButton : {}),
+    backgroundColor: W ? landingCtaPrimaryButton.backgroundColor : '#38A169',
+    borderRadius: W ? landingCtaPrimaryButton.borderRadius : 14,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 20,
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
   },
   generateText: {
+    ...(W ? landingCtaPrimaryButtonText : {}),
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
@@ -567,14 +578,15 @@ const styles = StyleSheet.create({
   resultsTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: C.textPrimary,
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   resultCard: {
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 16,
     padding: 16,
+    ...(W ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   resultHeader: {
     flexDirection: 'row',
@@ -583,19 +595,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   resultMode: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreBadge: {
-    backgroundColor: '#2D3748',
+    backgroundColor: W ? '#E2E8F0' : '#2D3748',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   scoreText: {
-    color: '#F6AD55',
+    color: W ? '#D97706' : '#F6AD55',
     fontSize: 13,
     fontWeight: '700',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -605,14 +617,14 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   resultExplain: {
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   backtestText: {
-    color: '#90CDF4',
+    color: W ? webDash.linkBlue : '#90CDF4',
     fontSize: 11,
     lineHeight: 16,
     marginBottom: 12,
@@ -624,53 +636,56 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#2D3748',
+    backgroundColor: W ? webDash.cardBg : '#2D3748',
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
+    borderWidth: W ? 1 : 0,
+    borderColor: W ? webDash.cardBorder : 'transparent',
     ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
   },
   actionButtonPressed: {
     opacity: 0.85,
   },
   actionText: {
-    color: '#FFFFFF',
+    color: W ? webDash.textPrimary : '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   disclaimer: {
     marginTop: 16,
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 14,
     padding: 16,
+    ...(W ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
 
   /* Score Explanation Box */
   scoreExplainBox: {
     marginTop: 12,
-    backgroundColor: '#0F1E38',
+    backgroundColor: W ? webDash.cardBg : '#0F1E38',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#2D3748',
+    borderColor: W ? webDash.cardBorder : '#2D3748',
     padding: 16,
   },
   scoreExplainTitle: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreExplainBody: {
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     fontSize: 13,
     lineHeight: 20,
     marginBottom: 14,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreExplainHighlight: {
-    color: '#F6AD55',
+    color: W ? webDash.accent : '#F6AD55',
     fontWeight: '600',
   },
   scoreExplainRows: {
@@ -681,35 +696,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1A2744',
+    backgroundColor: W ? '#FFFFFF' : '#1A2744',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    ...(W ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   scoreExplainRowLeft: {
     flex: 1,
     gap: 2,
   },
   scoreExplainRowLabel: {
-    color: '#E2E8F0',
+    color: W ? webDash.textPrimary : '#E2E8F0',
     fontSize: 12,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreExplainRowDesc: {
-    color: '#718096',
+    color: W ? webDash.textMuted : '#718096',
     fontSize: 11,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreExplainRowBonus: {
-    color: '#68D391',
+    color: W ? webDash.accent : '#68D391',
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   scoreExplainNote: {
-    color: '#4A5568',
+    color: W ? webDash.textMuted : '#4A5568',
     fontSize: 11,
     lineHeight: 16,
     fontStyle: 'italic',
@@ -717,21 +733,21 @@ const styles = StyleSheet.create({
   },
 
   disclaimerTitle: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontWeight: '700',
     fontSize: 15,
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   disclaimerText: {
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   disclaimerWarn: {
-    color: '#F6AD55',
+    color: '#D97706',
     fontSize: 12,
     fontStyle: 'italic',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -739,10 +755,10 @@ const styles = StyleSheet.create({
 
   /* Lucky Dates Panel */
   luckyPanel: {
-    backgroundColor: '#111C35',
+    backgroundColor: W ? webDash.cardBg : '#111C35',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#7B61FF44',
+    borderColor: W ? webDash.cardBorder : '#7B61FF44',
     marginBottom: 20,
     overflow: 'hidden',
   },
@@ -753,24 +769,24 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   luckyPanelTitle: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyPanelSubtitle: {
-    color: '#718096',
+    color: W ? webDash.textMuted : '#718096',
     fontSize: 11,
     marginTop: 2,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyPanelChevron: {
-    color: '#7B61FF',
+    color: W ? webDash.accent : '#7B61FF',
     fontSize: 13,
     fontWeight: '700',
   },
   luckyPanelDesc: {
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 16,
@@ -783,14 +799,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   luckyInput: {
-    backgroundColor: '#1A2744',
+    backgroundColor: W ? '#FFFFFF' : '#1A2744',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: '#2D3748',
+    borderColor: W ? webDash.inputBorder : '#2D3748',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyWeightRow: {
@@ -799,42 +815,42 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   luckyWeightLabel: {
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     marginRight: 4,
   },
   luckyWeightBtn: {
-    backgroundColor: '#1A2744',
+    backgroundColor: W ? '#FFFFFF' : '#1A2744',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#2D3748',
+    borderColor: W ? webDash.cardBorder : '#2D3748',
   },
   luckyWeightBtnActive: {
-    backgroundColor: '#2D1B69',
-    borderColor: '#7B61FF',
+    backgroundColor: W ? 'rgba(0, 163, 131, 0.15)' : '#2D1B69',
+    borderColor: W ? webDash.accent : '#7B61FF',
   },
   luckyWeightBtnText: {
-    color: '#718096',
+    color: W ? webDash.textMuted : '#718096',
     fontSize: 13,
     letterSpacing: 1,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyWeightBtnTextActive: {
-    color: '#B794F4',
+    color: W ? webDash.accent : '#B794F4',
   },
   luckyAddBtn: {
-    backgroundColor: '#2D1B69',
+    backgroundColor: W ? 'rgba(0, 163, 131, 0.12)' : '#2D1B69',
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#7B61FF',
+    borderColor: W ? webDash.accent : '#7B61FF',
   },
   luckyAddBtnText: {
-    color: '#B794F4',
+    color: W ? webDash.accent : '#B794F4',
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -845,7 +861,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   luckyDateRow: {
-    backgroundColor: '#1A2744',
+    backgroundColor: W ? '#FFFFFF' : '#1A2744',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -853,7 +869,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#2D3748',
+    borderColor: W ? webDash.cardBorder : '#2D3748',
   },
   luckyDateMain: {
     flex: 1,
@@ -872,18 +888,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   luckyDateLabel: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyDateValue: {
-    color: '#A0AEC0',
+    color: W ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyDateWeight: {
-    color: '#7B61FF',
+    color: W ? webDash.accent : '#7B61FF',
     fontSize: 11,
     letterSpacing: 1,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -895,20 +911,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   luckyExtractedLabel: {
-    color: '#4A5568',
+    color: W ? webDash.textMuted : '#4A5568',
     fontSize: 10,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   luckyExtractedChip: {
-    backgroundColor: '#2D1B69',
+    backgroundColor: W ? 'rgba(0, 163, 131, 0.12)' : '#2D1B69',
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: '#553C9A',
+    borderColor: W ? webDash.accent : '#553C9A',
   },
   luckyExtractedNum: {
-    color: '#B794F4',
+    color: W ? webDash.accent : '#B794F4',
     fontSize: 11,
     fontWeight: '700',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -917,12 +933,12 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#2D3748',
+    backgroundColor: W ? '#E2E8F0' : '#2D3748',
     alignItems: 'center',
     justifyContent: 'center',
   },
   luckyRemoveBtnText: {
-    color: '#FC8181',
+    color: '#DC2626',
     fontSize: 18,
     lineHeight: 22,
     fontWeight: '300',
@@ -930,12 +946,12 @@ const styles = StyleSheet.create({
   luckyGenerateBtn: {
     marginHorizontal: 16,
     marginBottom: 16,
-    backgroundColor: '#553C9A',
+    backgroundColor: W ? webDash.accent : '#553C9A',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#7B61FF',
+    borderColor: W ? webDash.accent : '#7B61FF',
   },
   luckyGenerateBtnText: {
     color: '#FFFFFF',

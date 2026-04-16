@@ -1,7 +1,7 @@
 // ============================================
 // Register Screen
 // ============================================
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,55 +11,56 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ScrollView,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import Svg, { Path } from 'react-native-svg';
 import { getSupabaseConfigError } from '../config/constants';
 import { signInWithGoogle, signUp } from '../services/authService';
 import { getEmailRegistrationError, isValidEmail } from '../utils/validation';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { GoogleSymbol } from '../components/GoogleSymbol';
-import { getLastAuthProvider, setLastAuthProvider } from '../utils/authProviderStorage';
+import { AuthNoticeBanner, type AuthNoticeVariant } from '../components/AuthNoticeBanner';
+import {
+  landingCtaPrimaryButton,
+  landingCtaPrimaryButtonDisabled,
+  landingCtaPrimaryButtonText,
+} from '../theme/landingCta';
+
+const SHOW_ICON_OUTER_PATH =
+  'M385.54,305.32c-.07-.21-.07-.43,0-.64,1.39-4.17,5.32-7.18,9.96-7.18s8.57,3.01,9.96,7.18c.07.21.07.43,0,.64-1.39,4.17-5.32,7.18-9.96,7.18s-8.57-3.01-9.96-7.18h0Z';
+const SHOW_ICON_PUPIL_PATH =
+  'M398.5,305c0,1.66-1.34,3-3,3s-3-1.34-3-3,1.34-3,3-3,3,1.34,3,3Z';
+const HIDE_ICON_PATH =
+  'M387.48,301.22c-.94,1.1-1.63,2.39-2.05,3.78,1.29,4.34,5.31,7.5,10.07,7.5.99,0,1.95-.14,2.86-.4M389.73,299.23c1.71-1.13,3.72-1.73,5.77-1.73,4.76,0,8.77,3.16,10.06,7.5-.71,2.37-2.23,4.41-4.29,5.77M389.73,299.23l-3.23-3.23M389.73,299.23l3.65,3.65M401.27,310.77l3.23,3.23M401.27,310.77l-3.65-3.65M397.62,307.12c1.17-1.17,1.17-3.07,0-4.24s-3.07-1.17-4.24,0M397.62,307.12l-4.24-4.24';
 
 export function RegisterScreen({ navigation, onBack }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
-  const [isLastUsedGoogle, setIsLastUsedGoogle] = useState(false);
   const configError = getSupabaseConfigError();
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
+  type AuthScreenNotice = {
+    variant: AuthNoticeVariant;
+    title: string;
+    message: string;
+    onDismiss?: () => void;
+    autoDismissMs?: number | null;
+  };
+  const [authNotice, setAuthNotice] = useState<AuthScreenNotice | null>(null);
+  const authNoticeRef = useRef<AuthScreenNotice | null>(null);
+  authNoticeRef.current = authNotice;
 
-      getLastAuthProvider().then((provider) => {
-        if (active) {
-          setIsLastUsedGoogle(provider === 'google');
-        }
-      });
+  const dismissAuthNotice = useCallback(() => {
+    const n = authNoticeRef.current;
+    setAuthNotice(null);
+    n?.onDismiss?.();
+  }, []);
 
-      return () => {
-        active = false;
-      };
-    }, [])
-  );
-
-  const showNotice = (title: string, message: string, onClose?: () => void) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.alert(`${title}\n\n${message}`);
-      onClose?.();
-      return;
-    }
-
-    Alert.alert(title, message, [
-      {
-        text: 'OK',
-        onPress: onClose,
-      },
-    ]);
+  const presentAuthNotice = (p: AuthScreenNotice) => {
+    setAuthNotice(p);
   };
 
   const handleEmailChange = (value: string) => {
@@ -80,7 +81,11 @@ export function RegisterScreen({ navigation, onBack }: any) {
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      presentAuthNotice({
+        variant: 'warning',
+        title: 'Missing information',
+        message: 'Please fill in all required fields.',
+      });
       return;
     }
     if (!isValidEmail(email)) {
@@ -98,17 +103,25 @@ export function RegisterScreen({ navigation, onBack }: any) {
         setEmailError(registrationError);
         return;
       }
-      showNotice('Registration Failed', error);
+      presentAuthNotice({ variant: 'error', title: 'Registration Failed', message: error });
     } else if (session) {
-      showNotice('Welcome!', 'Account created and signed in.', () => {
-        if (Platform.OS !== 'web') navigation.navigate('Main');
+      presentAuthNotice({
+        variant: 'success',
+        title: 'Welcome!',
+        message: 'Account created and signed in.',
+        autoDismissMs: null,
+        onDismiss: () => {
+          if (Platform.OS !== 'web') navigation.navigate('Main');
+        },
       });
     } else {
-      showNotice(
-        'Welcome!',
-        'Account created successfully. Please verify your email, then sign in.',
-        () => navigation.navigate('Login')
-      );
+      presentAuthNotice({
+        variant: 'success',
+        title: 'Welcome!',
+        message: 'Account created successfully. Please verify your email, then sign in.',
+        autoDismissMs: null,
+        onDismiss: () => navigation.navigate('Login'),
+      });
     }
   };
 
@@ -121,17 +134,22 @@ export function RegisterScreen({ navigation, onBack }: any) {
   };
 
   const handleGoogleLogin = async () => {
-    setIsLastUsedGoogle(true);
-    await setLastAuthProvider('google');
-
     setGoogleLoading(true);
     const { error } = await signInWithGoogle();
     setGoogleLoading(false);
 
     if (error) {
-      showNotice('Google Login Failed', error);
+      presentAuthNotice({ variant: 'error', title: 'Google Login Failed', message: error });
     }
   };
+
+  const canSubmitEmailPassword = useMemo(
+    () =>
+      email.trim().length > 0 &&
+      password.length > 0 &&
+      isValidEmail(email.trim()),
+    [email, password]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -139,11 +157,20 @@ export function RegisterScreen({ navigation, onBack }: any) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.inner}>
+        {authNotice && (
+          <AuthNoticeBanner
+            variant={authNotice.variant}
+            title={authNotice.title}
+            message={authNotice.message}
+            onDismiss={dismissAuthNotice}
+            autoDismissMs={authNotice.autoDismissMs}
+          />
+        )}
         <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
-          <LottoDreamLogo width={170} />
+          <LottoDreamLogo width={204} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Get started</Text>
+        <Text style={styles.title}>Get Started</Text>
         <Text style={styles.subtitle}>Create a new account</Text>
 
         {configError && (
@@ -154,11 +181,6 @@ export function RegisterScreen({ navigation, onBack }: any) {
         )}
 
         <View style={styles.googleButtonWrap}>
-          {isLastUsedGoogle && (
-            <View style={styles.lastUsedBadge}>
-              <Text style={styles.lastUsedBadgeText}>LAST USED</Text>
-            </View>
-          )}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleLogin}
@@ -184,7 +206,7 @@ export function RegisterScreen({ navigation, onBack }: any) {
         <View style={styles.form}>
           <TextInput
             style={[styles.input, !!emailError && styles.inputError]}
-            placeholder="you@example.com"
+            placeholder="Email"
             placeholderTextColor="#9CA3AF"
             value={email}
             onChangeText={handleEmailChange}
@@ -194,24 +216,62 @@ export function RegisterScreen({ navigation, onBack }: any) {
           />
           {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#9CA3AF"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Password (minimum 6 characters)"
+              placeholderTextColor="#9CA3AF"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity
+              style={styles.showHideButton}
+              onPress={() => setShowPassword((prev) => !prev)}
+            >
+              {showPassword ? (
+                <Svg style={styles.showHideSvg} viewBox="385 297 21 16" fill="none">
+                  <Path
+                    d={HIDE_ICON_PATH}
+                    stroke="#9CA3AF"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              ) : (
+                <Svg style={styles.showHideSvg} viewBox="385 297 21 16" fill="none">
+                  <Path
+                    d={SHOW_ICON_OUTER_PATH}
+                    stroke="#9CA3AF"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <Path
+                    d={SHOW_ICON_PUPIL_PATH}
+                    stroke="#9CA3AF"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
-            style={[styles.button, configError && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              ((!canSubmitEmailPassword || !!configError) && !loading) && styles.buttonDisabled,
+            ]}
             onPress={handleRegister}
-            disabled={loading || !!configError}
+            disabled={loading || !!configError || !canSubmitEmailPassword}
           >
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>Sign up</Text>
+              <Text style={styles.buttonText}>Sign Up</Text>
             )}
           </TouchableOpacity>
 
@@ -220,13 +280,21 @@ export function RegisterScreen({ navigation, onBack }: any) {
             onPress={() => navigation.navigate('Login')}
           >
             <Text style={styles.linkText}>
-              Have an account? <Text style={styles.linkBold}>Sign in</Text>
+              Have an account? <Text style={styles.linkBold}>Sign In</Text>
             </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.footer}>
-          By continuing, you agree to LottoDream's Terms of Service and Privacy Policy.
+          By continuing, you agree to LottoDream's{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('TermsOfService')}>
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('PrivacyPolicy')}>
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -306,22 +374,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  button: {
-    backgroundColor: '#1ABC9C',
+  passwordRow: {
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
-    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingRight: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15,
+    color: '#000000',
+  },
+  showHideButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  showHideSvg: {
+    width: 20,
+    height: 16,
+  },
+  button: {
+    ...landingCtaPrimaryButton,
     marginTop: 16,
   },
-  buttonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
+  buttonDisabled: landingCtaPrimaryButtonDisabled,
+  buttonText: landingCtaPrimaryButtonText,
   linkButton: {
     alignItems: 'center',
     marginTop: 12,
@@ -359,10 +442,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  footerLink: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   googleButtonWrap: {
-    position: 'relative',
     marginTop: 8,
-    overflow: 'visible',
   },
   googleButton: {
     backgroundColor: '#F3F4F6',
@@ -371,25 +458,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-  },
-  lastUsedBadge: {
-    position: 'absolute',
-    right: -10,
-    top: -11,
-    backgroundColor: '#065F46',
-    borderWidth: 1,
-    borderColor: '#10B981',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    zIndex: 2,
-  },
-  lastUsedBadgeText: {
-    color: '#A7F3D0',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   googleButtonContent: {
     flexDirection: 'row',

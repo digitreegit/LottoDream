@@ -1,7 +1,7 @@
 // ============================================
 // Retrieve Password Screen
 // ============================================
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,43 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { requestPasswordReset } from '../services/authService';
 import { isValidEmail } from '../utils/validation';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
+import { AuthNoticeBanner, type AuthNoticeVariant } from '../components/AuthNoticeBanner';
+import {
+  landingCtaPrimaryButton,
+  landingCtaPrimaryButtonDisabled,
+  landingCtaPrimaryButtonText,
+} from '../theme/landingCta';
 
 export function RetrievePasswordScreen({ navigation, route, onBack }: any) {
   const initialEmail = useMemo(() => route?.params?.email || '', [route?.params?.email]);
   const [email, setEmail] = useState(initialEmail);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+
+  type AuthScreenNotice = {
+    variant: AuthNoticeVariant;
+    title: string;
+    message: string;
+    onDismiss?: () => void;
+    autoDismissMs?: number | null;
+  };
+  const [authNotice, setAuthNotice] = useState<AuthScreenNotice | null>(null);
+  const authNoticeRef = useRef<AuthScreenNotice | null>(null);
+  authNoticeRef.current = authNotice;
+
+  const dismissAuthNotice = useCallback(() => {
+    const n = authNoticeRef.current;
+    setAuthNotice(null);
+    n?.onDismiss?.();
+  }, []);
+
+  const presentAuthNotice = (p: AuthScreenNotice) => {
+    setAuthNotice(p);
+  };
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
@@ -39,17 +65,13 @@ export function RetrievePasswordScreen({ navigation, route, onBack }: any) {
     setEmailError(isValidEmail(trimmedValue) ? '' : 'Enter a valid email address');
   };
 
-  const showNotice = (title: string, message: string) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.alert(`${title}\n\n${message}`);
-      return;
-    }
-    Alert.alert(title, message);
-  };
-
   const handleResetRequest = async () => {
     if (!email.trim()) {
-      showNotice('Email Required', 'Please enter your email address.');
+      presentAuthNotice({
+        variant: 'warning',
+        title: 'Email required',
+        message: 'Please enter your email address.',
+      });
       return;
     }
     if (!isValidEmail(email)) {
@@ -62,14 +84,15 @@ export function RetrievePasswordScreen({ navigation, route, onBack }: any) {
     setLoading(false);
 
     if (error) {
-      showNotice('Request Failed', error);
+      presentAuthNotice({ variant: 'error', title: 'Request Failed', message: error });
       return;
     }
 
-    showNotice(
-      'Check your email',
-      'A password reset link has been sent. Open the link in your email to continue.'
-    );
+    presentAuthNotice({
+      variant: 'success',
+      title: 'Check your email',
+      message: 'A password reset link has been sent. Open the link in your email to continue.',
+    });
   };
 
   const handleLogoPress = () => {
@@ -80,14 +103,28 @@ export function RetrievePasswordScreen({ navigation, route, onBack }: any) {
     navigation.navigate('Login');
   };
 
+  const canSubmitForgot = useMemo(
+    () => email.trim().length > 0 && isValidEmail(email.trim()),
+    [email]
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
+        {authNotice && (
+          <AuthNoticeBanner
+            variant={authNotice.variant}
+            title={authNotice.title}
+            message={authNotice.message}
+            onDismiss={dismissAuthNotice}
+            autoDismissMs={authNotice.autoDismissMs}
+          />
+        )}
         <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
-          <LottoDreamLogo width={170} />
+          <LottoDreamLogo width={204} />
         </TouchableOpacity>
 
         <Text style={styles.title}>Forgot your password?</Text>
@@ -107,14 +144,14 @@ export function RetrievePasswordScreen({ navigation, route, onBack }: any) {
           {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, !canSubmitForgot && !loading && styles.buttonDisabled]}
             onPress={handleResetRequest}
-            disabled={loading}
+            disabled={loading || !canSubmitForgot}
           >
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>Send reset code</Text>
+              <Text style={styles.buttonText}>Send Reset Code</Text>
             )}
           </TouchableOpacity>
 
@@ -129,7 +166,15 @@ export function RetrievePasswordScreen({ navigation, route, onBack }: any) {
         </View>
 
         <Text style={styles.footer}>
-          By continuing, you agree to LottoDream's Terms of Service and Privacy Policy.
+          By continuing, you agree to LottoDream's{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('TermsOfService')}>
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('PrivacyPolicy')}>
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -194,24 +239,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   button: {
-    backgroundColor: '#1ABC9C',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
+    ...landingCtaPrimaryButton,
     marginTop: 20,
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
+  buttonDisabled: landingCtaPrimaryButtonDisabled,
+  buttonText: landingCtaPrimaryButtonText,
   footer: {
     fontSize: 12,
     color: '#9CA3AF',
     textAlign: 'center',
     marginTop: 32,
     lineHeight: 18,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  footerLink: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   linkButton: {

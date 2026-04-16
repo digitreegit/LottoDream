@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
+import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
 
 interface Props {
   onLogin: () => void;
@@ -217,7 +218,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             onPress={onRegister}
             {...({ onMouseEnter: () => setHoveredButton('getStarted'), onMouseLeave: () => setHoveredButton(null) } as any)}
           >
-            <Text style={styles.ctaPrimaryText}>Getting Started</Text>
+            <Text style={styles.ctaPrimaryText}>Get Started</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -363,7 +364,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           onPress={onRegister}
           {...({ onMouseEnter: () => setHoveredButton('ctaBanner'), onMouseLeave: () => setHoveredButton(null) } as any)}
         >
-          <Text style={styles.ctaPrimaryText}>Getting Started</Text>
+          <Text style={styles.ctaPrimaryText}>Get Started</Text>
         </TouchableOpacity>
       </View>
 
@@ -394,7 +395,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             Data sourced from NY Open Data  •  Updated after every drawing
           </Text>
           <Text style={styles.footerText}>
-            © {new Date().getFullYear()} Skyface, LLC. All rights reserved.
+            © {new Date().getFullYear()} Lotto Dream. All rights reserved.
           </Text>
         </View>
       </View>
@@ -498,28 +499,25 @@ const styles = StyleSheet.create({
   navLogoWrap: { justifyContent: 'center', minHeight: 24 },
     /* Hamburger */
     hamburger: {
-      width: 34,
-      height: 34,
-      borderWidth: 1,
-      borderColor: '#CBD5E1',
-      borderRadius: 4,
+      width: 40,
+      height: 40,
       position: 'relative',
       alignItems: 'center',
       justifyContent: 'center',
     },
     hamburgerBar: {
-      width: 16,
+      width: 19,
       height: 2,
       borderRadius: 2,
       backgroundColor: '#1F2937',
       position: 'absolute',
     },
-    hamburgerBarTop: { top: 9 },
-    hamburgerBarMid: { top: 15 },
-    hamburgerBarBot: { top: 21 },
-    hamburgerBarTopOpen: { top: 15, transform: [{ rotate: '45deg' }] },
+    hamburgerBarTop: { top: 11 },
+    hamburgerBarMid: { top: 18 },
+    hamburgerBarBot: { top: 25 },
+    hamburgerBarTopOpen: { top: 18, transform: [{ rotate: '45deg' }] },
     hamburgerBarMidOpen: { opacity: 0 },
-    hamburgerBarBotOpen: { top: 15, transform: [{ rotate: '-45deg' }] },
+    hamburgerBarBotOpen: { top: 18, transform: [{ rotate: '-45deg' }] },
     /* Mobile Drawer */
     mobileOverlay: {
       position: 'absolute',
@@ -605,36 +603,24 @@ const styles = StyleSheet.create({
   },
   heroCtasWide: { maxWidth: 600 },
   ctaPrimary: {
-    backgroundColor: '#00A383',
-    borderRadius: 9999,
-    minHeight: 48,
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...landingCtaPrimaryButton,
     flexGrow: 0,
     flexShrink: 0,
   },
   ctaPrimaryWide: {
     alignSelf: 'center',
-    minWidth: 220,
+    minWidth: 160,
   },
   ctaPrimaryWeb: {
     cursor: 'pointer',
   } as any,
-  ctaPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
+  ctaPrimaryText: landingCtaPrimaryButtonText,
   ctaOutline: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 12,
     paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingHorizontal: 36,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,

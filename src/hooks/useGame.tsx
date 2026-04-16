@@ -34,7 +34,7 @@ export function useGame() {
 }
 
 /** Toggle button between Powerball and Mega Millions */
-export function GameSelector() {
+export function GameSelector({ light }: { light?: boolean }) {
   const { game, setGame } = useGame();
   const games: GameType[] = ['powerball', 'megamillions'];
 
@@ -53,6 +53,7 @@ export function GameSelector() {
             key={g}
             style={[
               styles.tab,
+              light && styles.tabLight,
               active && { backgroundColor: cfg.accentColor + '33', borderColor: cfg.accentColor },
             ]}
             onPress={() => setGame(g)}
@@ -82,6 +83,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A2744',
     borderWidth: 1.5,
     borderColor: '#2D3748',
+  },
+  tabLight: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
   },
   logo: {
     width: 60,

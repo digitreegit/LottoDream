@@ -1,7 +1,7 @@
 // ============================================
 // Navigation Setup
 // ============================================
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -13,6 +13,8 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { RetrievePasswordScreen } from '../screens/RetrievePasswordScreen';
 import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
+import { TermsOfServiceScreen } from '../screens/TermsOfServiceScreen';
+import { PrivacyPolicyScreen } from '../screens/PrivacyPolicyScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { AnalysisScreen } from '../screens/AnalysisScreen';
 import { PredictScreen } from '../screens/PredictScreen';
@@ -25,6 +27,53 @@ import { supabase } from '../config/supabase';
 const Stack = createNativeStackNavigator();
 const AuthStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+/** Web guest auth: path under app root (supports subpath e.g. /lotto/sign-in). */
+function getWebAuthPathRoot(): string {
+  if (typeof window === 'undefined') return '';
+  let p = window.location.pathname.replace(/\/(sign-in|sign-up|forgot-password)\/?$/i, '');
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  return p === '/' ? '' : p;
+}
+
+function buildWebAuthUrl(segment: 'sign-in' | 'sign-up' | 'forgot-password'): string {
+  const root = getWebAuthPathRoot();
+  const path = root ? `${root}/${segment}` : `/${segment}`;
+  return path.replace(/\/+/g, '/');
+}
+
+function getWebGuestAuthLinkingPrefixes(): string[] {
+  if (typeof window === 'undefined') return [];
+  const root = getWebAuthPathRoot();
+  const pathPart = root === '' ? '/' : root.endsWith('/') ? root : `${root}/`;
+  return [`${window.location.origin}${pathPart}`];
+}
+
+function webGuestAuthPathSegment(): string | null {
+  if (typeof window === 'undefined') return null;
+  const seg = window.location.pathname.split('/').filter(Boolean).pop() ?? '';
+  if (seg === 'sign-in' || seg === 'sign-up' || seg === 'forgot-password') return seg;
+  return null;
+}
+
+function getInitialWebAuthScreenFromUrl(): 'none' | 'login' | 'register' {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'none';
+  const seg = webGuestAuthPathSegment();
+  if (seg === 'sign-up') return 'register';
+  if (seg === 'sign-in' || seg === 'forgot-password') return 'login';
+  return 'none';
+}
+
+function replaceUrlWithWebLanding(): void {
+  if (typeof window === 'undefined') return;
+  const root = getWebAuthPathRoot();
+  window.history.replaceState({}, '', root === '' ? '/' : root);
+}
+
+function pushWebAuthUrl(segment: 'sign-in' | 'sign-up' | 'forgot-password'): void {
+  if (typeof window === 'undefined') return;
+  window.history.pushState({ ldGuestAuth: segment }, '', buildWebAuthUrl(segment));
+}
 
 // ── SVG Icon Components ──
 const HomeIcon = ({ color }: { color: string }) => (
@@ -166,10 +215,69 @@ function MainTabs() {
 
 export function AppNavigator() {
   const { user, loading, initialized } = useAuth();
-  const [webAuthScreen, setWebAuthScreen] = useState<'none' | 'login' | 'register'>('none');
+  const [webAuthScreen, setWebAuthScreen] = useState<'none' | 'login' | 'register'>(() =>
+    getInitialWebAuthScreenFromUrl()
+  );
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [webActiveMenu, setWebActiveMenu] = useState<'Home' | 'Analysis' | 'Predict' | 'Drawing'>('Home');
   const webNavRef = useNavigationContainerRef();
+  const webAuthScreenRef = useRef(webAuthScreen);
+  webAuthScreenRef.current = webAuthScreen;
+
+  const webGuestAuthLinking = useMemo(
+    () =>
+      Platform.OS === 'web' && typeof window !== 'undefined'
+        ? {
+            prefixes: getWebGuestAuthLinkingPrefixes(),
+            config: {
+              screens: {
+                Login: 'sign-in',
+                Register: 'sign-up',
+                RetrievePassword: 'forgot-password',
+              },
+            },
+          }
+        : undefined,
+    []
+  );
+
+  const closeWebGuestAuth = useCallback(() => {
+    replaceUrlWithWebLanding();
+    setWebAuthScreen('none');
+  }, []);
+
+  const openWebGuestLogin = useCallback(() => {
+    pushWebAuthUrl('sign-in');
+    setWebAuthScreen('login');
+  }, []);
+
+  const openWebGuestRegister = useCallback(() => {
+    pushWebAuthUrl('sign-up');
+    setWebAuthScreen('register');
+  }, []);
+
+  const completePasswordRecovery = useCallback((target: 'toLogin' | 'toApp' = 'toLogin') => {
+    setIsPasswordRecovery(false);
+    if (target === 'toLogin' && Platform.OS === 'web') {
+      pushWebAuthUrl('sign-in');
+      setWebAuthScreen('login');
+    }
+    if (target === 'toApp' && Platform.OS === 'web') {
+      replaceUrlWithWebLanding();
+      setWebAuthScreen('none');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const onPopState = () => {
+      if (webGuestAuthPathSegment() === null && webAuthScreenRef.current !== 'none') {
+        setWebAuthScreen('none');
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   useEffect(() => {
     const parseRecovery = (url: string | null | undefined) => {
@@ -223,10 +331,12 @@ export function AppNavigator() {
             {(props) => (
               <ResetPasswordScreen
                 {...props}
-                onResetComplete={() => setIsPasswordRecovery(false)}
+                onResetComplete={completePasswordRecovery}
               />
             )}
           </AuthStackNav.Screen>
+          <AuthStackNav.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+          <AuthStackNav.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </AuthStackNav.Navigator>
       </NavigationContainer>
     );
@@ -236,45 +346,49 @@ export function AppNavigator() {
   if (Platform.OS === 'web' && !user) {
     if (webAuthScreen === 'login') {
       return (
-        <NavigationContainer>
+        <NavigationContainer linking={webGuestAuthLinking}>
           <AuthStackNav.Navigator
             screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}
           >
             <AuthStackNav.Screen name="Login">
-              {(props) => <LoginScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+              {(props) => <LoginScreen {...props} onBack={closeWebGuestAuth} />}
             </AuthStackNav.Screen>
             <AuthStackNav.Screen name="Register">
-              {(props) => <RegisterScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+              {(props) => <RegisterScreen {...props} onBack={closeWebGuestAuth} />}
             </AuthStackNav.Screen>
             <AuthStackNav.Screen name="RetrievePassword">
-              {(props) => <RetrievePasswordScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+              {(props) => <RetrievePasswordScreen {...props} onBack={closeWebGuestAuth} />}
             </AuthStackNav.Screen>
             <AuthStackNav.Screen name="ResetPassword">
-              {(props) => <ResetPasswordScreen {...props} onResetComplete={() => setIsPasswordRecovery(false)} />}
+              {(props) => <ResetPasswordScreen {...props} onResetComplete={completePasswordRecovery} />}
             </AuthStackNav.Screen>
+            <AuthStackNav.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+            <AuthStackNav.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           </AuthStackNav.Navigator>
         </NavigationContainer>
       );
     }
     if (webAuthScreen === 'register') {
       return (
-        <NavigationContainer>
+        <NavigationContainer linking={webGuestAuthLinking}>
           <AuthStackNav.Navigator
             initialRouteName="Register"
             screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}
           >
             <AuthStackNav.Screen name="Login">
-              {(props) => <LoginScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+              {(props) => <LoginScreen {...props} onBack={closeWebGuestAuth} />}
             </AuthStackNav.Screen>
             <AuthStackNav.Screen name="Register">
-              {(props) => <RegisterScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+              {(props) => <RegisterScreen {...props} onBack={closeWebGuestAuth} />}
             </AuthStackNav.Screen>
             <AuthStackNav.Screen name="RetrievePassword">
-              {(props) => <RetrievePasswordScreen {...props} onBack={() => setWebAuthScreen('none')} />}
+              {(props) => <RetrievePasswordScreen {...props} onBack={closeWebGuestAuth} />}
             </AuthStackNav.Screen>
             <AuthStackNav.Screen name="ResetPassword">
-              {(props) => <ResetPasswordScreen {...props} onResetComplete={() => setIsPasswordRecovery(false)} />}
+              {(props) => <ResetPasswordScreen {...props} onResetComplete={completePasswordRecovery} />}
             </AuthStackNav.Screen>
+            <AuthStackNav.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+            <AuthStackNav.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           </AuthStackNav.Navigator>
         </NavigationContainer>
       );
@@ -282,8 +396,8 @@ export function AppNavigator() {
 
     return (
       <WebLandingPage
-        onLogin={() => setWebAuthScreen('login')}
-        onRegister={() => setWebAuthScreen('register')}
+        onLogin={openWebGuestLogin}
+        onRegister={openWebGuestRegister}
       />
     );
   }
@@ -328,6 +442,7 @@ export function AppNavigator() {
             screenOptions={{
               headerShown: false,
               tabBarStyle: { display: 'none' },
+              sceneStyle: { backgroundColor: '#FFFFFF' },
             }}
           >
             <Tab.Screen name="Home" component={HomeScreen} />
@@ -370,6 +485,8 @@ function AuthStack() {
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
       <AuthStackNav.Screen name="RetrievePassword" component={RetrievePasswordScreen} />
       <AuthStackNav.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <AuthStackNav.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+      <AuthStackNav.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
     </AuthStackNav.Navigator>
   );
 }

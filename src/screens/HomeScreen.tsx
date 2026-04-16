@@ -9,12 +9,16 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { LottoRow } from '../components/LottoBall';
 import { StatRow } from '../components/StatCard';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
+import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
+
+const isWeb = Platform.OS === 'web';
 
 export function HomeScreen({ navigation }: any) {
   const { game, config } = useGame();
@@ -35,13 +39,21 @@ export function HomeScreen({ navigation }: any) {
       }
     >
       {/* Header */}
-      <View style={styles.header}>
-        <LottoDreamLogo width={190} />
-        <Text style={styles.tagline}>{config.name} Smart Analysis</Text>
-      </View>
+      {!isWeb && (
+        <View style={styles.header}>
+          <LottoDreamLogo width={190} />
+          <Text style={styles.tagline}>{config.name} Smart Analysis</Text>
+        </View>
+      )}
+      {isWeb && (
+        <View style={styles.webHeader}>
+          <Text style={styles.webTitle}>{config.name} Smart Analysis</Text>
+          <Text style={styles.webSubtitle}>Latest draws, quick stats, and shortcuts to tools</Text>
+        </View>
+      )}
 
       {/* Game Selector */}
-      <GameSelector />
+      <GameSelector light={isWeb} />
 
       {/* Latest Draw */}
       <View style={styles.card}>
@@ -204,15 +216,42 @@ export function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1426',
+    ...Platform.select({
+      web: { backgroundColor: '#FFFFFF' },
+      default: { backgroundColor: '#0B1426' },
+    }),
   },
   content: {
-    padding: 16,
     paddingBottom: 40,
+    ...Platform.select({
+      web: { paddingHorizontal: 0, paddingTop: 12 },
+      default: { padding: 16 },
+    }),
   },
   header: {
     alignItems: 'center',
     paddingVertical: 20,
+  },
+  webHeader: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginBottom: 4,
+  },
+  webTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  webSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 8,
+    maxWidth: 520,
+    lineHeight: 20,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   tagline: {
     fontSize: 13,
@@ -221,22 +260,40 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   card: {
-    backgroundColor: '#1A2744',
     borderRadius: 16,
     padding: 18,
     marginVertical: 8,
+    ...Platform.select({
+      web: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+      },
+      default: {
+        backgroundColor: '#1A2744',
+      },
+    }),
   },
   cardTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 12,
+    ...Platform.select({
+      web: {
+        color: '#111827',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      },
+      default: { color: '#FFFFFF' },
+    }),
   },
   drawDate: {
     fontSize: 13,
-    color: '#A0AEC0',
     textAlign: 'center',
     marginBottom: 12,
+    ...Platform.select({
+      web: { color: '#64748B', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+      default: { color: '#A0AEC0' },
+    }),
   },
   ballRow: {
     alignItems: 'center',
@@ -249,16 +306,25 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   loadingText: {
-    color: '#718096',
     textAlign: 'center',
     fontSize: 15,
+    ...Platform.select({
+      web: { color: '#64748B' },
+      default: { color: '#718096' },
+    }),
   },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginTop: 16,
     marginBottom: 8,
+    ...Platform.select({
+      web: {
+        color: '#111827',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      },
+      default: { color: '#FFFFFF' },
+    }),
   },
   numberGrid: {
     flexDirection: 'row',
@@ -283,56 +349,103 @@ const styles = StyleSheet.create({
     borderColor: '#38B2AC',
   },
   chipText: {
-    color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 14,
+    ...Platform.select({
+      web: { color: '#111827' },
+      default: { color: '#FFFFFF' },
+    }),
   },
   ctaContainer: {
     marginVertical: 16,
     gap: 10,
   },
   ctaPrimary: {
-    backgroundColor: '#3182CE',
-    borderRadius: 14,
-    paddingVertical: 18,
     alignItems: 'center',
+    ...Platform.select({
+      web: {
+        ...landingCtaPrimaryButton,
+        minHeight: 52,
+        paddingVertical: 14,
+      },
+      default: {
+        backgroundColor: '#3182CE',
+        borderRadius: 14,
+        paddingVertical: 18,
+      },
+    }),
   },
   ctaPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
+    ...Platform.select({
+      web: {
+        ...landingCtaPrimaryButtonText,
+        fontSize: 17,
+        fontWeight: '600',
+      },
+      default: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '700',
+      },
+    }),
   },
   ctaSecondary: {
-    backgroundColor: '#2D3748',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#4A5568',
+    ...Platform.select({
+      web: {
+        backgroundColor: '#F8FAFC',
+        borderColor: '#CBD5E1',
+      },
+      default: {
+        backgroundColor: '#2D3748',
+        borderColor: '#4A5568',
+      },
+    }),
   },
   ctaSecondaryText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    ...Platform.select({
+      web: {
+        color: '#111827',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      },
+      default: { color: '#FFFFFF' },
+    }),
   },
   recentDraw: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#2D3748',
     alignItems: 'center',
     gap: 6,
+    ...Platform.select({
+      web: { borderBottomColor: '#E2E8F0' },
+      default: { borderBottomColor: '#2D3748' },
+    }),
   },
   recentDate: {
-    color: '#A0AEC0',
     fontSize: 13,
+    ...Platform.select({
+      web: { color: '#64748B' },
+      default: { color: '#A0AEC0' },
+    }),
   },
   footer: {
     marginTop: 24,
     alignItems: 'center',
   },
   footerText: {
-    color: '#4A5568',
     fontSize: 12,
     textAlign: 'center',
+    ...Platform.select({
+      web: {
+        color: '#64748B',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      },
+      default: { color: '#4A5568' },
+    }),
   },
 });

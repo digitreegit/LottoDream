@@ -17,6 +17,10 @@ import { getProfile, signOut } from '../services/authService';
 import { addDemoPoints, getSavedNumberSets, getTicketPurchases } from '../services/ticketService';
 import { LottoRow } from '../components/LottoBall';
 import { SavedNumberSet, TicketPurchase, UserProfile } from '../types';
+import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
+
+const C = isWebDashboard ? webDash : nativeDash;
 
 export function MyPageScreen({ navigation }: any) {
   const { user } = useAuth();
@@ -141,7 +145,7 @@ export function MyPageScreen({ navigation }: any) {
       </View>
 
       {loadingData ? (
-        <ActivityIndicator style={styles.loadingIndicator} color="#63B3ED" />
+        <ActivityIndicator style={styles.loadingIndicator} color={isWebDashboard ? webDash.accent : '#63B3ED'} />
       ) : (
         <>
           <View style={styles.menuSection}>
@@ -257,7 +261,7 @@ const menuStyles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#2D3748',
+    borderBottomColor: isWebDashboard ? webDash.rowBorder : '#2D3748',
   },
   icon: {
     fontSize: 18,
@@ -265,13 +269,13 @@ const menuStyles = StyleSheet.create({
   },
   label: {
     flex: 1,
-    color: '#FFFFFF',
+    color: isWebDashboard ? webDash.textPrimary : '#FFFFFF',
     fontSize: 14,
     fontWeight: '400',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   detail: {
-    color: '#718096',
+    color: isWebDashboard ? webDash.textSecondary : '#718096',
     fontSize: 13,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
@@ -280,11 +284,14 @@ const menuStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1426',
+    backgroundColor: C.screenBg,
   },
   content: {
-    padding: 16,
     paddingBottom: 40,
+    ...Platform.select({
+      web: { paddingHorizontal: 0, paddingTop: 12 },
+      default: { padding: 16 },
+    }),
   },
   centered: {
     flex: 1,
@@ -297,14 +304,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loginPromptTitle: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 22,
     fontWeight: '600',
     marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   loginPromptText: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
@@ -312,12 +319,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   loginButton: {
-    backgroundColor: '#3182CE',
-    borderRadius: 12,
+    ...(isWebDashboard ? landingCtaPrimaryButton : {}),
+    backgroundColor: isWebDashboard ? landingCtaPrimaryButton.backgroundColor : '#3182CE',
+    borderRadius: isWebDashboard ? landingCtaPrimaryButton.borderRadius : 12,
     paddingHorizontal: 40,
     paddingVertical: 14,
+    alignItems: 'center',
   },
   loginButtonText: {
+    ...(isWebDashboard ? landingCtaPrimaryButtonText : {}),
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
@@ -331,7 +341,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#3182CE',
+    backgroundColor: isWebDashboard ? webDash.accent : '#3182CE',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -343,49 +353,49 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   username: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 22,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   email: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 14,
     marginTop: 4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pointsCard: {
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F6AD5544',
+    borderColor: isWebDashboard ? webDash.cardBorder : '#F6AD5544',
   },
   pointsLabel: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 13,
     fontWeight: '500',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pointsValue: {
-    color: '#F6AD55',
+    color: '#D97706',
     fontSize: 37,
     fontWeight: '700',
     marginVertical: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   chargeButton: {
-    backgroundColor: '#F6AD5533',
+    backgroundColor: isWebDashboard ? 'rgba(0, 163, 131, 0.12)' : '#F6AD5533',
     borderRadius: 20,
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#F6AD55',
+    borderColor: isWebDashboard ? webDash.accent : '#F6AD55',
   },
   chargeText: {
-    color: '#F6AD55',
+    color: isWebDashboard ? webDash.accent : '#F6AD55',
     fontWeight: '600',
     fontSize: 14,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -397,19 +407,20 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   summaryLabel: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     fontWeight: '500',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   summaryValue: {
-    color: '#FFFFFF',
+    color: C.textPrimary,
     fontSize: 29,
     fontWeight: '700',
     marginTop: 8,
@@ -419,17 +430,18 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   emptyText: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 13,
     marginTop: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ticketCard: {
-    backgroundColor: '#0F1B33',
+    backgroundColor: isWebDashboard ? '#FFFFFF' : '#0F1B33',
     borderRadius: 12,
     padding: 12,
     marginTop: 10,
     gap: 10,
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   ticketHeader: {
     flexDirection: 'row',
@@ -437,30 +449,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ticketGame: {
-    color: '#63B3ED',
+    color: isWebDashboard ? webDash.accent : '#63B3ED',
     fontSize: 12,
     fontWeight: '700',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ticketStatus: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     fontWeight: '500',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   ticketMeta: {
-    color: '#718096',
+    color: isWebDashboard ? webDash.textMuted : '#718096',
     fontSize: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   menuSection: {
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   menuTitle: {
-    color: '#63B3ED',
+    color: isWebDashboard ? webDash.accent : '#63B3ED',
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -477,15 +490,16 @@ const styles = StyleSheet.create({
     borderColor: '#E53E3E44',
   },
   signOutText: {
-    color: '#FC8181',
+    color: '#DC2626',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   version: {
-    color: '#4A5568',
+    color: isWebDashboard ? webDash.textSecondary : '#4A5568',
     fontSize: 12,
     textAlign: 'center',
     marginTop: 20,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

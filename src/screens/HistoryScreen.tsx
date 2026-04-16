@@ -9,11 +9,15 @@ import {
   FlatList,
   RefreshControl,
   TextInput,
+  Platform,
 } from 'react-native';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { Draw } from '../types';
+import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+
+const C = isWebDashboard ? webDash : nativeDash;
 
 export function HistoryScreen() {
   const { game, config } = useGame();
@@ -72,14 +76,14 @@ export function HistoryScreen() {
       <Text style={styles.title}>🏆 Drawing</Text>
 
       {/* Game Selector */}
-      <GameSelector />
+      <GameSelector light={isWebDashboard} />
 
       {/* Search */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
           placeholder="Search by number (e.g. 7 14 21)"
-          placeholderTextColor="#718096"
+          placeholderTextColor={isWebDashboard ? '#94A3B8' : '#718096'}
           value={search}
           onChangeText={setSearch}
           keyboardType="numeric"
@@ -114,50 +118,55 @@ export function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1426',
+    backgroundColor: C.screenBg,
   },
   title: {
     fontSize: 27,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: C.textPrimary,
     textAlign: 'center',
     paddingTop: 16,
     paddingBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   searchContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: isWebDashboard ? 0 : 16,
     marginBottom: 8,
   },
   searchInput: {
-    backgroundColor: '#1A2744',
+    backgroundColor: isWebDashboard ? webDash.inputBg : '#1A2744',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#FFFFFF',
+    color: isWebDashboard ? webDash.textPrimary : '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#2D3748',
+    borderColor: isWebDashboard ? webDash.inputBorder : '#2D3748',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   searchResult: {
-    color: '#63B3ED',
+    color: isWebDashboard ? webDash.accent : '#63B3ED',
     fontSize: 13,
     marginTop: 4,
     marginLeft: 4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: isWebDashboard ? 0 : 16,
     paddingBottom: 40,
+    ...Platform.select({
+      web: { paddingTop: 4 },
+      default: {},
+    }),
   },
   drawItem: {
-    backgroundColor: '#1A2744',
+    backgroundColor: C.cardBg,
     borderRadius: 12,
     padding: 14,
     marginVertical: 4,
     alignItems: 'center',
     gap: 8,
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   drawInfo: {
     flexDirection: 'row',
@@ -165,25 +174,25 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   drawNumber: {
-    color: '#718096',
+    color: isWebDashboard ? webDash.textSecondary : '#718096',
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   drawDate: {
-    color: '#A0AEC0',
+    color: isWebDashboard ? webDash.textMuted : '#A0AEC0',
     fontSize: 14,
     fontWeight: '500',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   pp: {
-    color: '#F6AD55',
+    color: '#D97706',
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   empty: {
-    color: '#718096',
+    color: isWebDashboard ? webDash.textSecondary : '#718096',
     textAlign: 'center',
     marginTop: 40,
     fontSize: 18,

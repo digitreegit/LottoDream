@@ -4,7 +4,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../config/supabase';
 import { Session, User } from '@supabase/supabase-js';
-import { setLastAuthProvider } from '../utils/authProviderStorage';
 
 interface AuthState {
   user: User | null;
@@ -29,32 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    const inferProvider = (user: User | null): string | null => {
-      if (!user) return null;
-
-      const providersFromMeta = (user.app_metadata as { providers?: string[] } | undefined)?.providers;
-      if (Array.isArray(providersFromMeta) && providersFromMeta.includes('google')) {
-        return 'google';
-      }
-
-      const providerFromMeta = (user.app_metadata as { provider?: string } | undefined)?.provider;
-      if (providerFromMeta === 'google') return 'google';
-      if (providerFromMeta) return providerFromMeta;
-
-      const googleIdentity = user.identities?.find((identity) => identity.provider === 'google');
-      if (googleIdentity?.provider) return 'google';
-
-      const firstIdentityProvider = (user.identities?.[0] as { provider?: string } | undefined)?.provider;
-      return firstIdentityProvider || null;
-    };
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      const provider = inferProvider(session?.user ?? null);
-      if (provider) {
-        void setLastAuthProvider(provider);
-      }
-
       setState({
         user: session?.user ?? null,
         session,
@@ -66,11 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        const provider = inferProvider(session?.user ?? null);
-        if (provider) {
-          void setLastAuthProvider(provider);
-        }
-
         setState((prev) => ({
           ...prev,
           user: session?.user ?? null,

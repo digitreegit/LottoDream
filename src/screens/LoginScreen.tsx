@@ -1,8 +1,7 @@
 // ============================================
 // Login Screen
 // ============================================
-import React, { useEffect, useState } from 'react';
-import { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,16 +11,19 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { useFocusEffect } from '@react-navigation/native';
 import { signIn, signInWithGoogle } from '../services/authService';
 import { getSupabaseConfigError } from '../config/constants';
 import { isValidEmail } from '../utils/validation';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { GoogleSymbol } from '../components/GoogleSymbol';
-import { getLastAuthProvider, setLastAuthProvider } from '../utils/authProviderStorage';
+import { AuthNoticeBanner, type AuthNoticeVariant } from '../components/AuthNoticeBanner';
+import {
+  landingCtaPrimaryButton,
+  landingCtaPrimaryButtonDisabled,
+  landingCtaPrimaryButtonText,
+} from '../theme/landingCta';
 
 const SHOW_ICON_OUTER_PATH =
   'M385.54,305.32c-.07-.21-.07-.43,0-.64,1.39-4.17,5.32-7.18,9.96-7.18s8.57,3.01,9.96,7.18c.07.21.07.43,0,.64-1.39,4.17-5.32,7.18-9.96,7.18s-8.57-3.01-9.96-7.18h0Z';
@@ -37,31 +39,27 @@ export function LoginScreen({ navigation, onBack }: any) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
-  const [isLastUsedGoogle, setIsLastUsedGoogle] = useState(false);
   const configError = getSupabaseConfigError();
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
+  type AuthScreenNotice = {
+    variant: AuthNoticeVariant;
+    title: string;
+    message: string;
+    onDismiss?: () => void;
+    autoDismissMs?: number | null;
+  };
+  const [authNotice, setAuthNotice] = useState<AuthScreenNotice | null>(null);
+  const authNoticeRef = useRef<AuthScreenNotice | null>(null);
+  authNoticeRef.current = authNotice;
 
-      getLastAuthProvider().then((provider) => {
-        if (active) {
-          setIsLastUsedGoogle(provider === 'google');
-        }
-      });
+  const dismissAuthNotice = useCallback(() => {
+    const n = authNoticeRef.current;
+    setAuthNotice(null);
+    n?.onDismiss?.();
+  }, []);
 
-      return () => {
-        active = false;
-      };
-    }, [])
-  );
-
-  const showNotice = (title: string, message: string) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.alert(`${title}\n\n${message}`);
-      return;
-    }
-    Alert.alert(title, message);
+  const presentAuthNotice = (p: AuthScreenNotice) => {
+    setAuthNotice(p);
   };
 
   const handleEmailChange = (value: string) => {
@@ -82,7 +80,11 @@ export function LoginScreen({ navigation, onBack }: any) {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter email and password');
+      presentAuthNotice({
+        variant: 'warning',
+        title: 'Missing information',
+        message: 'Please enter email and password.',
+      });
       return;
     }
     if (!isValidEmail(email)) {
@@ -93,12 +95,16 @@ export function LoginScreen({ navigation, onBack }: any) {
     const { error, session } = await signIn(email.trim(), password);
     setLoading(false);
     if (error) {
-      showNotice('Login Failed', error);
+      presentAuthNotice({ variant: 'error', title: 'Login Failed', message: error });
       return;
     }
 
     if (!session) {
-      showNotice('Login Failed', 'No active session was created. Please try again.');
+      presentAuthNotice({
+        variant: 'error',
+        title: 'Login Failed',
+        message: 'No active session was created. Please try again.',
+      });
       return;
     }
 
@@ -117,17 +123,22 @@ export function LoginScreen({ navigation, onBack }: any) {
   };
 
   const handleGoogleLogin = async () => {
-    setIsLastUsedGoogle(true);
-    await setLastAuthProvider('google');
-
     setGoogleLoading(true);
     const { error } = await signInWithGoogle();
     setGoogleLoading(false);
 
     if (error) {
-      showNotice('Google Login Failed', error);
+      presentAuthNotice({ variant: 'error', title: 'Google Login Failed', message: error });
     }
   };
+
+  const canSubmitEmailPassword = useMemo(
+    () =>
+      email.trim().length > 0 &&
+      password.length > 0 &&
+      isValidEmail(email.trim()),
+    [email, password]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -135,11 +146,20 @@ export function LoginScreen({ navigation, onBack }: any) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
+        {authNotice && (
+          <AuthNoticeBanner
+            variant={authNotice.variant}
+            title={authNotice.title}
+            message={authNotice.message}
+            onDismiss={dismissAuthNotice}
+            autoDismissMs={authNotice.autoDismissMs}
+          />
+        )}
         <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
-          <LottoDreamLogo width={170} />
+          <LottoDreamLogo width={204} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
         {configError && (
@@ -150,11 +170,6 @@ export function LoginScreen({ navigation, onBack }: any) {
         )}
 
         <View style={styles.googleButtonWrap}>
-          {isLastUsedGoogle && (
-            <View style={styles.lastUsedBadge}>
-              <Text style={styles.lastUsedBadgeText}>LAST USED</Text>
-            </View>
-          )}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleLogin}
@@ -180,7 +195,7 @@ export function LoginScreen({ navigation, onBack }: any) {
         <View style={styles.form}>
           <TextInput
             style={[styles.input, !!emailError && styles.inputError]}
-            placeholder="you@example.com"
+            placeholder="Email"
             placeholderTextColor="#9CA3AF"
             value={email}
             onChangeText={handleEmailChange}
@@ -241,14 +256,17 @@ export function LoginScreen({ navigation, onBack }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.button, configError && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              ((!canSubmitEmailPassword || !!configError) && !loading) && styles.buttonDisabled,
+            ]}
             onPress={handleLogin}
-            disabled={loading || !!configError}
+            disabled={loading || !!configError || !canSubmitEmailPassword}
           >
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
+              <Text style={styles.buttonText}>Sign In</Text>
             )}
           </TouchableOpacity>
 
@@ -257,13 +275,21 @@ export function LoginScreen({ navigation, onBack }: any) {
             onPress={() => navigation.navigate('Register')}
           >
             <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkBold}>Sign up</Text>
+              Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.footer}>
-          By continuing, you agree to LottoDream's Terms of Service and Privacy Policy.
+          By continuing, you agree to LottoDream's{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('TermsOfService')}>
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('PrivacyPolicy')}>
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -380,21 +406,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   button: {
-    backgroundColor: '#1ABC9C',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
+    ...landingCtaPrimaryButton,
     marginTop: 16,
   },
-  buttonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
+  buttonDisabled: landingCtaPrimaryButtonDisabled,
+  buttonText: landingCtaPrimaryButtonText,
   linkButton: {
     alignItems: 'center',
     marginTop: 12,
@@ -432,10 +448,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  footerLink: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   googleButtonWrap: {
-    position: 'relative',
     marginTop: 8,
-    overflow: 'visible',
   },
   googleButton: {
     backgroundColor: '#F3F4F6',
@@ -444,25 +464,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-  },
-  lastUsedBadge: {
-    position: 'absolute',
-    right: -10,
-    top: -11,
-    backgroundColor: '#065F46',
-    borderWidth: 1,
-    borderColor: '#10B981',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    zIndex: 2,
-  },
-  lastUsedBadgeText: {
-    color: '#A7F3D0',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   googleButtonContent: {
     flexDirection: 'row',
