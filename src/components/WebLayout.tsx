@@ -175,10 +175,6 @@ const styles = StyleSheet.create({
   profileIconBtn: {
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: 'rgba(148, 163, 184, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 4,

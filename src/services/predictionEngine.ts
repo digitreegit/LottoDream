@@ -13,12 +13,16 @@ import * as Crypto from 'expo-crypto';
 export function generatePrediction(
   draws: Draw[],
   mode: PredictionMode,
-  game: GameType = 'powerball'
+  game: GameType = 'powerball',
+  /** Append to RNG seed so Regenerate can produce a new draw without changing history inputs. */
+  seedEntropy = ''
 ): PredictionSet {
   const config = getGameConfig(game);
   const analysis = analyzeDraws(draws, 'prediction', config);
   const recent = analyzeDraws(draws.slice(0, 50), 'recent', config);
-  const rng = createSeededRng(`${game}:${mode}:${draws.length}:${draws[0]?.draw_date || 'none'}`);
+  const rng = createSeededRng(
+    `${game}:${mode}:${draws.length}:${draws[0]?.draw_date || 'none'}${seedEntropy}`
+  );
 
   let whites: number[];
   let pb: number;
@@ -383,11 +387,14 @@ function luckyDatesStrategy(
 export function generateLuckyDatesPrediction(
   draws: Draw[],
   luckyDates: LuckyDate[],
-  game: GameType = 'powerball'
+  game: GameType = 'powerball',
+  seedEntropy = ''
 ): PredictionSet {
   const config = getGameConfig(game);
   const analysis = analyzeDraws(draws, 'prediction', config);
-  const rng = createSeededRng(`${game}:lucky:${draws.length}:${luckyDates.map((d) => d.date).join('|')}`);
+  const rng = createSeededRng(
+    `${game}:lucky:${draws.length}:${luckyDates.map((d) => d.date).join('|')}${seedEntropy}`
+  );
   const { whites, pb, score, explanation } = luckyDatesStrategy(luckyDates, analysis, config, rng);
   const qualityScore = adjustScore(whites, pb, analysis, score, config);
   const backtest = backtestPrediction(whites, pb, draws);

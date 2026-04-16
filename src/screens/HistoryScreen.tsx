@@ -11,6 +11,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
+import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
@@ -108,6 +109,7 @@ export function HistoryScreen() {
             {loading ? 'Loading draws...' : 'No draws found'}
           </Text>
         }
+        ListFooterComponent={LandingStyleFooter}
         initialNumToRender={20}
         maxToRenderPerBatch={20}
       />

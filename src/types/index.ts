@@ -134,6 +134,19 @@ export interface SavedNumberSet {
   created_at: string;
 }
 
+/** User-curated combinations (favorites, analysis/history tracking) */
+export interface NumberCollectionItem {
+  id: string;
+  user_id: string;
+  game: GameType;
+  name?: string;
+  /** manual | analysis_tracking | history_watch */
+  source: string;
+  whites: number[];
+  powerball: number;
+  created_at: string;
+}
+
 /** Navigation param types */
 export type RootStackParamList = {
   Auth: undefined;

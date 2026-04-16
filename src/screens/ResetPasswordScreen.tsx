@@ -11,11 +11,11 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { signOut, updatePassword } from '../services/authService';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
+import { AppFeedbackModal, type AppFeedbackVariant } from '../components/AppFeedbackModal';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
 
 const SHOW_ICON_OUTER_PATH =
@@ -31,20 +31,38 @@ export function ResetPasswordScreen({ navigation, onResetComplete }: any) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    title: string;
+    message: string;
+    variant: AppFeedbackVariant;
+    onConfirm?: () => void;
+  } | null>(null);
 
   const handleResetPassword = async () => {
     if (!newPassword.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please enter and confirm your new password');
+      setFeedback({
+        title: 'Error',
+        message: 'Please enter and confirm your new password',
+        variant: 'error',
+      });
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setFeedback({
+        title: 'Error',
+        message: 'Password must be at least 6 characters',
+        variant: 'error',
+      });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      setFeedback({
+        title: 'Error',
+        message: 'Passwords do not match',
+        variant: 'error',
+      });
       return;
     }
 
@@ -53,7 +71,7 @@ export function ResetPasswordScreen({ navigation, onResetComplete }: any) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Reset Failed', error);
+      setFeedback({ title: 'Reset Failed', message: error, variant: 'error' });
       return;
     }
 
@@ -61,12 +79,12 @@ export function ResetPasswordScreen({ navigation, onResetComplete }: any) {
       onResetComplete();
     }
 
-    Alert.alert('Success', 'Password updated successfully.', [
-      {
-        text: 'OK',
-        onPress: () => onResetComplete?.('toApp'),
-      },
-    ]);
+    setFeedback({
+      title: 'Success',
+      message: 'Password updated successfully.',
+      variant: 'success',
+      onConfirm: () => onResetComplete?.('toApp'),
+    });
   };
 
   return (
@@ -196,6 +214,19 @@ export function ResetPasswordScreen({ navigation, onResetComplete }: any) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <AppFeedbackModal
+        visible={feedback != null}
+        title={feedback?.title ?? ''}
+        message={feedback?.message ?? ''}
+        variant={feedback?.variant ?? 'default'}
+        confirmLabel="OK"
+        onConfirm={() => {
+          const extra = feedback?.onConfirm;
+          setFeedback(null);
+          extra?.();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

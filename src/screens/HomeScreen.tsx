@@ -16,6 +16,7 @@ import { StatRow } from '../components/StatCard';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
+import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
 
 const isWeb = Platform.OS === 'web';
@@ -203,12 +204,7 @@ export function HomeScreen({ navigation }: any) {
         ))}
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Data source: NY Open Data{'\n'}
-          Updated after every drawing
-        </Text>
-      </View>
+      <LandingStyleFooter />
     </ScrollView>
   );
 }
@@ -431,21 +427,6 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: { color: '#64748B' },
       default: { color: '#A0AEC0' },
-    }),
-  },
-  footer: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    textAlign: 'center',
-    ...Platform.select({
-      web: {
-        color: '#64748B',
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      },
-      default: { color: '#4A5568' },
     }),
   },
 });

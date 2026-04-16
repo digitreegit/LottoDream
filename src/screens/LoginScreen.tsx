@@ -1,7 +1,8 @@
 // ============================================
 // Login Screen
 // ============================================
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -24,6 +25,11 @@ import {
   landingCtaPrimaryButtonDisabled,
   landingCtaPrimaryButtonText,
 } from '../theme/landingCta';
+import {
+  getLastAuthMethod,
+  setLastAuthMethod,
+  type LastAuthMethod,
+} from '../services/lastAuthMethodStorage';
 
 const SHOW_ICON_OUTER_PATH =
   'M385.54,305.32c-.07-.21-.07-.43,0-.64,1.39-4.17,5.32-7.18,9.96-7.18s8.57,3.01,9.96,7.18c.07.21.07.43,0,.64-1.39,4.17-5.32,7.18-9.96,7.18s-8.57-3.01-9.96-7.18h0Z';
@@ -51,6 +57,20 @@ export function LoginScreen({ navigation, onBack }: any) {
   const [authNotice, setAuthNotice] = useState<AuthScreenNotice | null>(null);
   const authNoticeRef = useRef<AuthScreenNotice | null>(null);
   authNoticeRef.current = authNotice;
+
+  const [lastUsedMethod, setLastUsedMethod] = useState<LastAuthMethod | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void getLastAuthMethod().then((m) => {
+        if (!cancelled) setLastUsedMethod(m);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   const dismissAuthNotice = useCallback(() => {
     const n = authNoticeRef.current;
@@ -108,6 +128,8 @@ export function LoginScreen({ navigation, onBack }: any) {
       return;
     }
 
+    void setLastAuthMethod('email');
+
     // On web the auth state change auto-switches the view
     if (Platform.OS !== 'web') {
       navigation.navigate('Main');
@@ -129,7 +151,9 @@ export function LoginScreen({ navigation, onBack }: any) {
 
     if (error) {
       presentAuthNotice({ variant: 'error', title: 'Google Login Failed', message: error });
+      return;
     }
+    void setLastAuthMethod('google');
   };
 
   const canSubmitEmailPassword = useMemo(
@@ -170,6 +194,11 @@ export function LoginScreen({ navigation, onBack }: any) {
         )}
 
         <View style={styles.googleButtonWrap}>
+          {lastUsedMethod === 'google' ? (
+            <Text style={[styles.lastUsedLabel, styles.lastUsedOnGoogle]} pointerEvents="none">
+              LAST USED
+            </Text>
+          ) : null}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleLogin}
@@ -193,16 +222,25 @@ export function LoginScreen({ navigation, onBack }: any) {
         </View>
 
         <View style={styles.form}>
-          <TextInput
-            style={[styles.input, !!emailError && styles.inputError]}
-            placeholder="Email"
-            placeholderTextColor="#9CA3AF"
-            value={email}
-            onChangeText={handleEmailChange}
-            onBlur={handleEmailBlur}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          <View
+            style={[styles.inputShell, lastUsedMethod === 'email' && styles.inputShellBadgeRoom]}
+          >
+            {lastUsedMethod === 'email' ? (
+              <Text style={[styles.lastUsedLabel, styles.lastUsedOnEmail]} pointerEvents="none">
+                LAST USED
+              </Text>
+            ) : null}
+            <TextInput
+              style={[styles.input, !!emailError && styles.inputError]}
+              placeholder="Email"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={handleEmailChange}
+              onBlur={handleEmailBlur}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
           {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
           <View style={styles.passwordRow}>
             <TextInput
@@ -330,6 +368,37 @@ const styles = StyleSheet.create({
   form: {
     gap: 14,
   },
+  inputShell: {
+    position: 'relative',
+  },
+  inputShellBadgeRoom: {
+    paddingTop: 6,
+  },
+  lastUsedLabel: {
+    position: 'absolute',
+    zIndex: 2,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.35,
+    color: '#111827',
+    backgroundColor: '#C8F0E8',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 163, 131, 0.28)',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  /** Half the pill sits above the control edge (Supabase-style) */
+  lastUsedOnGoogle: {
+    top: -5,
+    right: -10,
+  },
+  lastUsedOnEmail: {
+    top: -5,
+    right: -10,
+  },
   errorBanner: {
     backgroundColor: '#FEE2E2',
     borderWidth: 1,
@@ -456,6 +525,8 @@ const styles = StyleSheet.create({
   },
   googleButtonWrap: {
     marginTop: 8,
+    paddingTop: 6,
+    position: 'relative',
   },
   googleButton: {
     backgroundColor: '#F3F4F6',

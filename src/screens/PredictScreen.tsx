@@ -1,19 +1,19 @@
 // ============================================
 // Predict Screen - Number Generation
 // ============================================
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Pressable,
   ActivityIndicator,
-  Alert,
   TextInput,
   Platform,
 } from 'react-native';
+import { AuthNoticeBanner, type AuthNoticeVariant } from '../components/AuthNoticeBanner';
+import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
@@ -27,17 +27,12 @@ import { generatePrediction, generateAllPredictions, generateLuckyDatesPredictio
 import { savePredictionSet } from '../services/ticketService';
 import { PredictionSet, PredictionMode, LuckyDate } from '../types';
 
-function notify(title: string, message?: string) {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.alert(message ? `${title}\n\n${message}` : title);
-    return;
-  }
-  if (message) {
-    Alert.alert(title, message);
-  } else {
-    Alert.alert(title);
-  }
-}
+type PredictNotice = {
+  variant: AuthNoticeVariant;
+  title: string;
+  message: string;
+  autoDismissMs?: number | null;
+};
 
 const MODE_INFO: Record<PredictionMode, { icon: string; label: string; desc: string }> = {
   hot: {
@@ -86,87 +81,174 @@ export function PredictScreen() {
   const [newLabel, setNewLabel] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newWeight, setNewWeight] = useState<1 | 2 | 3>(2);
+  const [notice, setNotice] = useState<PredictNotice | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
-  const handleGenerateAll = useCallback(() => {
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  const presentNotice = useCallback((p: PredictNotice) => setNotice(p), []);
+
+  const scrollPredictToTop = useCallback(() => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, []);
+
+  const runLuckyGeneration = useCallback(() => {
+    if (luckyDates.length === 0) {
+      presentNotice({
+        variant: 'warning',
+        title: '날짜 없음',
+        message: 'Lucky Dates에 날짜를 추가한 뒤 다시 시도해주세요.',
+      });
+      setShowLuckyPanel(true);
+      return;
+    }
     if (draws.length === 0) {
-      notify(
-        '\uB370\uC774\uD130 \uC5C6\uC74C',
-        '\uB2F9\uCCA8 \uBC88\uD638 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
-      );
+      presentNotice({
+        variant: 'warning',
+        title: '데이터 없음',
+        message: '당첨 번호 데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요.',
+      });
       return;
     }
     setGenerating(true);
-    // Run in next tick to allow UI update
+    setTimeout(() => {
+      try {
+        const entropy = `:${Date.now()}:${Math.random()}`;
+        const result = generateLuckyDatesPrediction(draws, luckyDates, game, entropy);
+        setPredictions((prev) => {
+          const filtered = prev.filter((p) => p.mode !== 'lucky');
+          return [result, ...filtered];
+        });
+        setSelectedMode('lucky');
+      } catch (e: any) {
+        presentNotice({
+          variant: 'error',
+          title: '생성 실패',
+          message: e?.message || '럭키 픽을 만들 수 없습니다.',
+        });
+      } finally {
+        setGenerating(false);
+      }
+    }, 100);
+  }, [luckyDates, draws, game, presentNotice]);
+
+  const handleGenerateAll = useCallback(() => {
+    if (draws.length === 0) {
+      presentNotice({
+        variant: 'warning',
+        title: '데이터 없음',
+        message: '당첨 번호 데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요.',
+      });
+      return;
+    }
+    setGenerating(true);
     setTimeout(() => {
       try {
         const results = generateAllPredictions(draws, game);
         setPredictions(results);
         setSelectedMode(null);
       } catch (e: any) {
-        notify('생성 실패', e?.message || '번호 조합을 만들 수 없습니다.');
+        presentNotice({
+          variant: 'error',
+          title: '생성 실패',
+          message: e?.message || '번호 조합을 만들 수 없습니다.',
+        });
       } finally {
         setGenerating(false);
       }
     }, 100);
-  }, [draws, game]);
+  }, [draws, game, presentNotice]);
 
   const handleGenerateSingle = useCallback(
-    (mode: PredictionMode) => {
+    (mode: PredictionMode, isRegenerate = false) => {
+      if (mode === 'lucky') {
+        runLuckyGeneration();
+        return;
+      }
       if (draws.length === 0) {
-        notify(
-          '\uB370\uC774\uD130 \uC5C6\uC74C',
-          '\uB2F9\uCCA8 \uBC88\uD638 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
-        );
+        presentNotice({
+          variant: 'warning',
+          title: '데이터 없음',
+          message: '당첨 번호 데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요.',
+        });
         return;
       }
       setGenerating(true);
       setTimeout(() => {
         try {
-          const result = generatePrediction(draws, mode, game);
+          const seedEntropy = isRegenerate ? `:${Date.now()}:${Math.random()}` : '';
+          const result = generatePrediction(draws, mode, game, seedEntropy);
           setPredictions((prev) => {
             const filtered = prev.filter((p) => p.mode !== mode);
             return [result, ...filtered];
           });
           setSelectedMode(mode);
         } catch (e: any) {
-          notify('생성 실패', e?.message || '이 모드의 번호를 다시 만들 수 없습니다.');
+          presentNotice({
+            variant: 'error',
+            title: '생성 실패',
+            message: e?.message || '이 모드의 번호를 다시 만들 수 없습니다.',
+          });
         } finally {
           setGenerating(false);
         }
       }, 100);
     },
-    [draws, game]
+    [draws, game, runLuckyGeneration, presentNotice]
   );
 
-  const handleSave = useCallback(async (prediction: PredictionSet) => {
-    if (!user) {
-      notify('로그인 필요', '번호를 저장하려면 로그인해주세요.');
-      return;
-    }
+  const handleSave = useCallback(
+    async (prediction: PredictionSet) => {
+      if (!user) {
+        presentNotice({
+          variant: 'warning',
+          title: '로그인 필요',
+          message: '번호를 저장하려면 로그인해주세요.',
+        });
+        scrollPredictToTop();
+        return;
+      }
 
-    const { error } = await savePredictionSet(prediction);
-    if (error) {
-      notify('저장 실패', error);
-      return;
-    }
+      const { error } = await savePredictionSet(prediction);
+      if (error) {
+        const isAuth =
+          /sign in|not authenticated|login|unauthorized|jwt|session|profile/i.test(error);
+        presentNotice({
+          variant: isAuth ? 'warning' : 'error',
+          title: isAuth ? '로그인 필요' : '저장 실패',
+          message: error,
+        });
+        scrollPredictToTop();
+        return;
+      }
 
-    notify('\uC800\uC7A5 \uC644\uB8CC', '\uC120\uD0DD\uD55C \uBC88\uD638 \uC870\uD569\uC774 \uACC4\uC815\uC5D0 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
-  }, [user]);
+      presentNotice({
+        variant: 'success',
+        title: '저장 완료',
+        message: '선택한 번호 조합이 계정에 저장되었습니다.',
+      });
+      scrollPredictToTop();
+    },
+    [user, presentNotice, scrollPredictToTop]
+  );
 
   const handleAddLuckyDate = useCallback(() => {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!newLabel.trim()) {
-      notify(
-        '\uC774\uB984 \uC5C6\uC74C',
-        '\uB0A0\uC9DC \uC774\uB984\uC744 \uC785\uB825\uD574\uC8FC\uC138\uC694. (\uC608: \uC0DD\uC77C, \uAE30\uB150\uC77C)'
-      );
+      presentNotice({
+        variant: 'warning',
+        title: '이름 없음',
+        message: '날짜 이름을 입력해주세요. (예: 생일, 기념일)',
+      });
       return;
     }
     if (!dateRegex.test(newDate.trim())) {
-      notify(
-        '\uB0A0\uC9DC \uD615\uC2DD \uC624\uB958',
-        'YYYY-MM-DD \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD574\uC8FC\uC138\uC694. (\uC608: 1990-03-15)'
-      );
+      presentNotice({
+        variant: 'warning',
+        title: '날짜 형식 오류',
+        message: 'YYYY-MM-DD 형식으로 입력해주세요. (예: 1990-03-15)',
+      });
       return;
     }
     setLuckyDates((prev) => [
@@ -176,49 +258,33 @@ export function PredictScreen() {
     setNewLabel('');
     setNewDate('');
     setNewWeight(2);
-  }, [newLabel, newDate, newWeight]);
+  }, [newLabel, newDate, newWeight, presentNotice]);
 
   const handleRemoveLuckyDate = useCallback((id: string) => {
     setLuckyDates((prev) => prev.filter((ld) => ld.id !== id));
   }, []);
 
-  const handleGenerateLucky = useCallback(() => {
-    if (luckyDates.length === 0) return;
-    if (draws.length === 0) {
-      notify(
-        '\uB370\uC774\uD130 \uC5C6\uC74C',
-        '\uB2F9\uCCA8 \uBC88\uD638 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
-      );
-      return;
-    }
-    setGenerating(true);
-    setTimeout(() => {
-      try {
-        const result = generateLuckyDatesPrediction(draws, luckyDates, game);
-        setPredictions((prev) => {
-          const filtered = prev.filter((p) => p.mode !== 'lucky');
-          return [result, ...filtered];
-        });
-        setSelectedMode('lucky');
-      } catch (e: any) {
-        notify(
-          '\uC0DD\uC131 \uC2E4\uD328',
-          e?.message || '\uB7EC\uD0A4 \uD53D\uC744 \uB9CC\uB4E4 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.'
-        );
-      } finally {
-        setGenerating(false);
-      }
-    }, 100);
-  }, [luckyDates, draws, game]);
-
-
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="always"
-      keyboardDismissMode="on-drag"
-    >
+    <View style={styles.pageRoot}>
+      {notice && (
+        <View style={styles.noticeStrip}>
+          <AuthNoticeBanner
+            variant={notice.variant}
+            title={notice.title}
+            message={notice.message}
+            onDismiss={dismissNotice}
+            autoDismissMs={notice.autoDismissMs}
+            containerStyle={styles.predictNoticeBanner}
+          />
+        </View>
+      )}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="on-drag"
+      >
       <Text style={styles.title}>🎯 Smart Picks</Text>
       <Text style={styles.subtitle}>
         AI-powered number recommendations based on{'\n'}
@@ -367,7 +433,7 @@ export function PredictScreen() {
             {luckyDates.length > 0 && (
               <TouchableOpacity
                 style={styles.luckyGenerateBtn}
-                onPress={handleGenerateLucky}
+                onPress={runLuckyGeneration}
                 disabled={generating || dataLoading}
               >
                 {generating ? (
@@ -417,20 +483,22 @@ export function PredictScreen() {
                 )}
 
                 <View style={styles.resultActions}>
-                  <Pressable
-                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
-                    onPress={() => handleSave(pred)}
-                    android_ripple={{ color: '#4A5568' }}
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    activeOpacity={0.85}
+                    onPress={() => void handleSave(pred)}
+                    disabled={generating || dataLoading}
                   >
                     <Text style={styles.actionText}>💾 Save</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
-                    onPress={() => handleGenerateSingle(pred.mode)}
-                    android_ripple={{ color: '#4A5568' }}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    activeOpacity={0.85}
+                    onPress={() => handleGenerateSingle(pred.mode, true)}
+                    disabled={generating || dataLoading}
                   >
                     <Text style={styles.actionText}>🔄 Regenerate</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               </View>
             );
@@ -484,14 +552,28 @@ export function PredictScreen() {
           Please play responsibly.
         </Text>
       </View>
+      <LandingStyleFooter />
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  pageRoot: {
     flex: 1,
     backgroundColor: C.screenBg,
+  },
+  noticeStrip: {
+    ...Platform.select({
+      web: {},
+      default: { paddingHorizontal: 16, paddingTop: 4 },
+    }),
+  },
+  predictNoticeBanner: {
+    marginBottom: 12,
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     paddingBottom: 40,
@@ -643,9 +725,6 @@ const styles = StyleSheet.create({
     borderWidth: W ? 1 : 0,
     borderColor: W ? webDash.cardBorder : 'transparent',
     ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
-  },
-  actionButtonPressed: {
-    opacity: 0.85,
   },
   actionText: {
     color: W ? webDash.textPrimary : '#FFFFFF',

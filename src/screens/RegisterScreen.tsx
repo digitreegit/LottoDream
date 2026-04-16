@@ -16,6 +16,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { getSupabaseConfigError } from '../config/constants';
 import { signInWithGoogle, signUp } from '../services/authService';
+import { setLastAuthMethod } from '../services/lastAuthMethodStorage';
 import { getEmailRegistrationError, isValidEmail } from '../utils/validation';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { GoogleSymbol } from '../components/GoogleSymbol';
@@ -105,6 +106,7 @@ export function RegisterScreen({ navigation, onBack }: any) {
       }
       presentAuthNotice({ variant: 'error', title: 'Registration Failed', message: error });
     } else if (session) {
+      void setLastAuthMethod('email');
       presentAuthNotice({
         variant: 'success',
         title: 'Welcome!',
@@ -140,7 +142,9 @@ export function RegisterScreen({ navigation, onBack }: any) {
 
     if (error) {
       presentAuthNotice({ variant: 'error', title: 'Google Login Failed', message: error });
+      return;
     }
+    void setLastAuthMethod('google');
   };
 
   const canSubmitEmailPassword = useMemo(

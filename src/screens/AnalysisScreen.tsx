@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { NumberHeatmap } from '../components/NumberHeatmap';
 import { StatRow } from '../components/StatCard';
 import { LottoRow } from '../components/LottoBall';
@@ -236,6 +237,7 @@ export function AnalysisScreen() {
           </View>
         </>
       )}
+      <LandingStyleFooter />
     </ScrollView>
   );
 }

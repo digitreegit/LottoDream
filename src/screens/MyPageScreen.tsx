@@ -1,58 +1,183 @@
 // ============================================
 // My Page Screen - User profile & settings
 // ============================================
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  Pressable,
   ActivityIndicator,
   Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { getProfile, signOut } from '../services/authService';
-import { addDemoPoints, getSavedNumberSets, getTicketPurchases } from '../services/ticketService';
+import {
+  getSavedNumberSets,
+  getNumberCollectionItems,
+  addNumberCollectionItem,
+  deleteNumberCollectionItem,
+  type NumberCollectionSource,
+} from '../services/ticketService';
+import { getGameConfig } from '../config/constants';
+import { LandingStyleFooter } from '../components/LandingStyleFooter';
+import { AppFeedbackModal, type AppFeedbackVariant } from '../components/AppFeedbackModal';
 import { LottoRow } from '../components/LottoBall';
-import { SavedNumberSet, TicketPurchase, UserProfile } from '../types';
+import { GameType, NumberCollectionItem, SavedNumberSet, UserProfile } from '../types';
 import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
 
 const C = isWebDashboard ? webDash : nativeDash;
 
+const SOURCE_LABELS: Record<NumberCollectionSource, string> = {
+  manual: '✏️ Manual favorite',
+  analysis_tracking: '📊 From analysis',
+  history_watch: '📜 History / draws',
+};
+
 export function MyPageScreen({ navigation }: any) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [tickets, setTickets] = useState<TicketPurchase[]>([]);
   const [savedNumbers, setSavedNumbers] = useState<SavedNumberSet[]>([]);
+  const [collectionItems, setCollectionItems] = useState<NumberCollectionItem[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+  const [savedNumbersOpen, setSavedNumbersOpen] = useState(true);
+  const [numberCollectionOpen, setNumberCollectionOpen] = useState(false);
+  const [collectionModalVisible, setCollectionModalVisible] = useState(false);
+  const [savingCollection, setSavingCollection] = useState(false);
+  const [collGame, setCollGame] = useState<GameType>('powerball');
+  const [collName, setCollName] = useState('');
+  const [collSource, setCollSource] = useState<NumberCollectionSource>('manual');
+  const [collWhites, setCollWhites] = useState(['', '', '', '', '']);
+  const [collPb, setCollPb] = useState('');
+  const [collectionFormError, setCollectionFormError] = useState<string | null>(null);
+  const [pendingDeleteCollection, setPendingDeleteCollection] = useState<NumberCollectionItem | null>(null);
+  const [deletingCollection, setDeletingCollection] = useState(false);
+  const [alertFeedback, setAlertFeedback] = useState<{
+    title: string;
+    message: string;
+    variant: AppFeedbackVariant;
+  } | null>(null);
+  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
 
-  useEffect(() => {
-    if (user) {
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) {
+        setProfile(null);
+        setSavedNumbers([]);
+        setCollectionItems([]);
+        return undefined;
+      }
+
+      let cancelled = false;
       setLoadingData(true);
-      Promise.all([getProfile(), getTicketPurchases(5), getSavedNumberSets(5)])
-        .then(([nextProfile, nextTickets, nextSaved]) => {
-          setProfile(nextProfile);
-          setTickets(nextTickets);
-          setSavedNumbers(nextSaved);
+      Promise.all([getProfile(), getSavedNumberSets(5), getNumberCollectionItems(50)])
+        .then(([nextProfile, nextSaved, nextColl]) => {
+          if (!cancelled) {
+            setProfile(nextProfile);
+            setSavedNumbers(nextSaved);
+            setCollectionItems(nextColl);
+          }
         })
-        .finally(() => setLoadingData(false));
-    }
-  }, [user]);
+        .finally(() => {
+          if (!cancelled) setLoadingData(false);
+        });
 
-  const handleChargePoints = async () => {
-    const { error } = await addDemoPoints(30);
-    if (error) {
-      Alert.alert('Charge Failed', error);
+      return () => {
+        cancelled = true;
+      };
+    }, [user])
+  );
+
+  const openCollectionModal = useCallback(() => {
+    setCollGame('powerball');
+    setCollName('');
+    setCollSource('manual');
+    setCollWhites(['', '', '', '', '']);
+    setCollPb('');
+    setCollectionFormError(null);
+    setCollectionModalVisible(true);
+  }, []);
+
+  const submitCollectionModal = useCallback(async () => {
+    const cfg = getGameConfig(collGame);
+    const parsed = collWhites.map((s) => parseInt(s.trim(), 10));
+    if (parsed.some((n) => Number.isNaN(n))) {
+      setCollectionFormError(`Enter five integers (1–${cfg.whiteMax}).`);
       return;
     }
+    if (new Set(parsed).size !== 5) {
+      setCollectionFormError('Main numbers must be unique.');
+      return;
+    }
+    for (const n of parsed) {
+      if (n < 1 || n > cfg.whiteMax) {
+        setCollectionFormError(`Each main number must be between 1 and ${cfg.whiteMax}.`);
+        return;
+      }
+    }
+    const pb = parseInt(collPb.trim(), 10);
+    if (Number.isNaN(pb)) {
+      setCollectionFormError(`Enter ${cfg.bonusLabel} (1–${cfg.bonusMax}).`);
+      return;
+    }
+    if (pb < 1 || pb > cfg.bonusMax) {
+      setCollectionFormError(`${cfg.bonusLabel} must be between 1 and ${cfg.bonusMax}.`);
+      return;
+    }
+    setCollectionFormError(null);
+    setSavingCollection(true);
+    try {
+      const { error } = await addNumberCollectionItem({
+        game: collGame,
+        name: collName.trim() || undefined,
+        source: collSource,
+        whites: parsed,
+        powerball: pb,
+      });
+      if (error) {
+        setCollectionFormError(error);
+        return;
+      }
+      setCollectionModalVisible(false);
+      const next = await getNumberCollectionItems(50);
+      setCollectionItems(next);
+    } catch (e: any) {
+      setCollectionFormError(e?.message || 'Unknown error.');
+    } finally {
+      setSavingCollection(false);
+    }
+  }, [collGame, collName, collSource, collWhites, collPb]);
 
-    const nextProfile = await getProfile();
-    setProfile(nextProfile);
-    Alert.alert('Points Added', '30 demo points were added to your account.');
-  };
+  const confirmDeleteCollection = useCallback((item: NumberCollectionItem) => {
+    setPendingDeleteCollection(item);
+  }, []);
+
+  const cancelDeleteCollection = useCallback(() => {
+    setPendingDeleteCollection(null);
+  }, []);
+
+  const runDeleteCollection = useCallback(async () => {
+    const item = pendingDeleteCollection;
+    if (!item) return;
+    setDeletingCollection(true);
+    try {
+      const { error } = await deleteNumberCollectionItem(item.id);
+      if (error) {
+        setAlertFeedback({ title: 'Could not remove', message: error, variant: 'error' });
+        return;
+      }
+      setCollectionItems((prev) => prev.filter((x) => x.id !== item.id));
+      setPendingDeleteCollection(null);
+    } finally {
+      setDeletingCollection(false);
+    }
+  }, [pendingDeleteCollection]);
 
   const performSignOut = async () => {
     try {
@@ -64,29 +189,16 @@ export function MyPageScreen({ navigation }: any) {
         });
       }
     } catch (error: any) {
-      Alert.alert('Sign Out Failed', error?.message || 'Please try again.');
+      setAlertFeedback({
+        title: 'Sign out failed',
+        message: error?.message || 'Please try again.',
+        variant: 'error',
+      });
     }
   };
 
   const handleSignOut = () => {
-    if (Platform.OS === 'web') {
-      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to sign out?') : true;
-      if (confirmed) {
-        void performSignOut();
-      }
-      return;
-    }
-
-    Alert.alert('Sign Out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: () => {
-          void performSignOut();
-        },
-      },
-    ]);
+    setSignOutConfirmVisible(true);
   };
 
   if (!user) {
@@ -96,7 +208,7 @@ export function MyPageScreen({ navigation }: any) {
           <Text style={styles.loginPromptIcon}>🔒</Text>
           <Text style={styles.loginPromptTitle}>Sign In Required</Text>
           <Text style={styles.loginPromptText}>
-            Sign in to access your profile, saved numbers, and purchase history.
+            Sign in to access your profile and saved numbers.
           </Text>
           <TouchableOpacity
             style={styles.loginButton}
@@ -110,6 +222,7 @@ export function MyPageScreen({ navigation }: any) {
   }
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
@@ -122,53 +235,32 @@ export function MyPageScreen({ navigation }: any) {
         <Text style={styles.email}>{user.email}</Text>
       </View>
 
-      {/* Points Balance */}
-      <View style={styles.pointsCard}>
-        <Text style={styles.pointsLabel}>Points Balance</Text>
-        <Text style={styles.pointsValue}>
-          {(profile?.points || 0).toLocaleString()}
-        </Text>
-        <TouchableOpacity style={styles.chargeButton} onPress={handleChargePoints}>
-          <Text style={styles.chargeText}>+ Add 30 Demo Points</Text>
+      {/* Menu Items */}
+      <View style={styles.menuSection}>
+        <Text style={styles.menuTitle}>Account</Text>
+        <MenuItem icon="✏️" label="Edit Profile" onPress={() => {}} />
+        <MenuItem icon="💳" label="Payment Methods" onPress={() => {}} />
+      </View>
+
+      <View style={styles.menuSection}>
+        <Text style={styles.menuTitle}>My Lottery</Text>
+        <TouchableOpacity
+          style={[menuStyles.item, styles.accordionHeaderWeb]}
+          onPress={() => setSavedNumbersOpen((o) => !o)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: savedNumbersOpen }}
+          accessibilityLabel="Saved Numbers"
+        >
+          <Text style={menuStyles.icon}>💾</Text>
+          <Text style={menuStyles.label}>Saved Numbers</Text>
+          <Text style={menuStyles.chevron}>{savedNumbersOpen ? '▼' : '▶'}</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Saved Sets</Text>
-          <Text style={styles.summaryValue}>{savedNumbers.length}</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Purchases</Text>
-          <Text style={styles.summaryValue}>{tickets.length}</Text>
-        </View>
-      </View>
-
-      {loadingData ? (
-        <ActivityIndicator style={styles.loadingIndicator} color={isWebDashboard ? webDash.accent : '#63B3ED'} />
-      ) : (
-        <>
-          <View style={styles.menuSection}>
-            <Text style={styles.menuTitle}>Recent Purchases</Text>
-            {tickets.length === 0 ? (
-              <Text style={styles.emptyText}>No purchased tickets yet.</Text>
-            ) : (
-              tickets.map((ticket) => (
-                <View key={ticket.id} style={styles.ticketCard}>
-                  <View style={styles.ticketHeader}>
-                    <Text style={styles.ticketGame}>{ticket.game.toUpperCase()}</Text>
-                    <Text style={styles.ticketStatus}>{ticket.status}</Text>
-                  </View>
-                  <LottoRow whites={ticket.whites} powerball={ticket.powerball} game={ticket.game} size={28} />
-                  <Text style={styles.ticketMeta}>Draw: {ticket.draw_date} · {ticket.points_spent} pts</Text>
-                </View>
-              ))
-            )}
-          </View>
-
-          <View style={styles.menuSection}>
-            <Text style={styles.menuTitle}>Saved Numbers</Text>
-            {savedNumbers.length === 0 ? (
+        {savedNumbersOpen ? (
+          <View style={styles.savedNumbersInLottery}>
+            {loadingData ? (
+              <ActivityIndicator style={styles.lotterySavedLoading} color={isWebDashboard ? webDash.accent : '#63B3ED'} />
+            ) : savedNumbers.length === 0 ? (
               <Text style={styles.emptyText}>No saved numbers yet.</Text>
             ) : (
               savedNumbers.map((item) => (
@@ -182,39 +274,70 @@ export function MyPageScreen({ navigation }: any) {
               ))
             )}
           </View>
-        </>
-      )}
-
-      {/* Menu Items */}
-      <View style={styles.menuSection}>
-        <Text style={styles.menuTitle}>Account</Text>
-        <MenuItem icon="✏️" label="Edit Profile" onPress={() => {}} />
-        <MenuItem icon="💳" label="Payment Methods" onPress={() => {}} />
-        <MenuItem icon="📊" label="Charge History" onPress={() => {}} />
-        <MenuItem icon="🎫" label="Purchase History" onPress={() => {}} />
-      </View>
-
-      <View style={styles.menuSection}>
-        <Text style={styles.menuTitle}>Lottery</Text>
-        <MenuItem icon="📋" label="My Tickets" onPress={() => {}} />
-        <MenuItem icon="💾" label="Saved Numbers" onPress={() => {}} />
-        <MenuItem icon="🏆" label="Winning History" onPress={() => {}} />
-        <MenuItem icon="📈" label="Number Collection" onPress={() => {}} />
-      </View>
-
-      <View style={styles.menuSection}>
-        <Text style={styles.menuTitle}>Social</Text>
-        <MenuItem
-          icon="🤝"
-          label="Referral Code"
-          detail={profile?.referral_code || '-'}
-          onPress={() => {
-            if (profile?.referral_code) {
-              Alert.alert('Your Referral Code', profile.referral_code);
-            }
-          }}
-        />
-        <MenuItem icon="👥" label="Invite Friends" onPress={() => {}} />
+        ) : null}
+        <View style={styles.lotterySectionDivider} />
+        <TouchableOpacity
+          style={[menuStyles.item, styles.accordionHeaderWeb]}
+          onPress={() => setNumberCollectionOpen((o) => !o)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: numberCollectionOpen }}
+          accessibilityLabel="Number Collection"
+        >
+          <Text style={menuStyles.icon}>📈</Text>
+          <Text style={menuStyles.label}>Number Collection</Text>
+          <Text style={menuStyles.chevron}>{numberCollectionOpen ? '▼' : '▶'}</Text>
+        </TouchableOpacity>
+        {numberCollectionOpen ? (
+          <View style={styles.collectionBody}>
+            <Text style={styles.collectionIntro}>
+              Keep favorite combos here, or note sets you are watching from Analysis and draw History.
+            </Text>
+            <View style={styles.collectionActions}>
+              <TouchableOpacity
+                style={[styles.collectionBtn, styles.collectionBtnPrimary]}
+                onPress={openCollectionModal}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.collectionBtnPrimaryText}>＋ Add combination</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.collectionBtn}
+                onPress={() => navigation.navigate('Analysis')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.collectionBtnText}>Open Analysis</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.collectionBtn}
+                onPress={() => navigation.navigate('History')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.collectionBtnText}>Drawing history</Text>
+              </TouchableOpacity>
+            </View>
+            {loadingData ? (
+              <ActivityIndicator style={styles.lotterySavedLoading} color={isWebDashboard ? webDash.accent : '#63B3ED'} />
+            ) : collectionItems.length === 0 ? (
+              <Text style={styles.emptyText}>No entries yet. Add a combination or visit Analysis / History.</Text>
+            ) : (
+              collectionItems.map((item) => (
+                <View key={item.id} style={styles.ticketCard}>
+                  <View style={styles.ticketHeader}>
+                    <Text style={styles.ticketGame}>{item.game.toUpperCase()}</Text>
+                    <TouchableOpacity onPress={() => confirmDeleteCollection(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={styles.collectionRemove}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.collectionMeta}>
+                    {(item.name || 'Untitled') + ' · ' + (SOURCE_LABELS[item.source as NumberCollectionSource] || item.source)}
+                  </Text>
+                  <LottoRow whites={item.whites} powerball={item.powerball} game={item.game} size={28} />
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.menuSection}>
@@ -230,7 +353,214 @@ export function MyPageScreen({ navigation }: any) {
       </TouchableOpacity>
 
       <Text style={styles.version}>LottoDream v1.0.0</Text>
+      <LandingStyleFooter />
     </ScrollView>
+
+      <Modal
+        visible={collectionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setCollectionModalVisible(false);
+          setCollectionFormError(null);
+        }}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add to collection</Text>
+            <Text style={styles.modalHint}>Five main numbers + bonus for the selected game.</Text>
+
+            <Text style={styles.modalFieldLabel}>Game</Text>
+            <View style={styles.gamePickRow}>
+              {(['powerball', 'megamillions'] as const).map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.gameChip, collGame === g && styles.gameChipOn]}
+                  onPress={() => {
+                    setCollGame(g);
+                    setCollectionFormError(null);
+                  }}
+                >
+                  <Text style={[styles.gameChipText, collGame === g && styles.gameChipTextOn]}>
+                    {g === 'powerball' ? 'Powerball' : 'Mega Millions'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalFieldLabel}>Label (optional)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={collName}
+              onChangeText={setCollName}
+              placeholder="e.g. Weekly lucky set"
+              placeholderTextColor={isWebDashboard ? '#94A3B8' : '#718096'}
+            />
+
+            <Text style={styles.modalFieldLabel}>How you use it</Text>
+            <View style={styles.sourcePickCol}>
+              {(Object.keys(SOURCE_LABELS) as NumberCollectionSource[]).map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.sourceRow, collSource === key && styles.sourceRowOn]}
+                  onPress={() => setCollSource(key)}
+                >
+                  <Text style={[styles.sourceRowText, collSource === key && styles.sourceRowTextOn]}>
+                    {SOURCE_LABELS[key]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalFieldLabel}>Main numbers (5)</Text>
+            <View style={styles.whiteInputsRow}>
+              {collWhites.map((v, i) => (
+                <TextInput
+                  key={i}
+                  style={styles.whiteInput}
+                  value={v}
+                  onChangeText={(t) => {
+                    setCollectionFormError(null);
+                    const next = [...collWhites];
+                    next[i] = t.replace(/[^0-9]/g, '');
+                    setCollWhites(next);
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  placeholder="–"
+                  placeholderTextColor={isWebDashboard ? '#94A3B8' : '#718096'}
+                />
+              ))}
+            </View>
+
+            <Text style={styles.modalFieldLabel}>{getGameConfig(collGame).bonusLabel}</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={collPb}
+              onChangeText={(t) => {
+                setCollectionFormError(null);
+                setCollPb(t.replace(/[^0-9]/g, ''));
+              }}
+              keyboardType="number-pad"
+              maxLength={2}
+              placeholder="–"
+              placeholderTextColor={isWebDashboard ? '#94A3B8' : '#718096'}
+            />
+
+            {collectionFormError ? (
+              <Text style={styles.collectionInlineError}>{collectionFormError}</Text>
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setCollectionModalVisible(false);
+                  setCollectionFormError(null);
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, savingCollection && styles.modalSaveBtnDisabled]}
+                onPress={() => void submitCollectionModal()}
+                disabled={savingCollection}
+              >
+                {savingCollection ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={pendingDeleteCollection != null}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelDeleteCollection}
+      >
+        <View style={styles.confirmBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={cancelDeleteCollection}
+            accessibilityRole="button"
+            accessibilityLabel="Close dialog"
+          />
+          <View style={styles.confirmCardWrap} pointerEvents="box-none">
+            <View style={styles.confirmCard}>
+              <Text style={styles.confirmTitle}>Remove from collection?</Text>
+              <Text style={styles.confirmSubtitle}>
+                This will not affect Saved Numbers from Predict — only this collection entry.
+              </Text>
+              {pendingDeleteCollection ? (
+                <View style={styles.confirmPreview}>
+                  <Text style={styles.confirmPreviewMeta}>
+                    {pendingDeleteCollection.game.toUpperCase()}
+                    {(pendingDeleteCollection.name ? ` · ${pendingDeleteCollection.name}` : '')}
+                  </Text>
+                  <LottoRow
+                    whites={pendingDeleteCollection.whites}
+                    powerball={pendingDeleteCollection.powerball}
+                    game={pendingDeleteCollection.game}
+                    size={30}
+                  />
+                </View>
+              ) : null}
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={styles.confirmBtnSecondary}
+                  onPress={cancelDeleteCollection}
+                  disabled={deletingCollection}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.confirmBtnSecondaryText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmBtnDanger, deletingCollection && styles.modalSaveBtnDisabled]}
+                  onPress={() => void runDeleteCollection()}
+                  disabled={deletingCollection}
+                  activeOpacity={0.85}
+                >
+                  {deletingCollection ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.confirmBtnDangerText}>Remove</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <AppFeedbackModal
+        visible={alertFeedback != null}
+        title={alertFeedback?.title ?? ''}
+        message={alertFeedback?.message ?? ''}
+        variant={alertFeedback?.variant ?? 'error'}
+        confirmLabel="OK"
+        onConfirm={() => setAlertFeedback(null)}
+      />
+
+      <AppFeedbackModal
+        visible={signOutConfirmVisible}
+        title="Sign out?"
+        message="You will need to sign in again to access your profile and saved numbers."
+        variant="warning"
+        cancelLabel="Cancel"
+        onCancel={() => setSignOutConfirmVisible(false)}
+        confirmLabel="Sign out"
+        confirmDestructive
+        onConfirm={() => {
+          setSignOutConfirmVisible(false);
+          void performSignOut();
+        }}
+      />
+    </>
   );
 }
 
@@ -246,7 +576,11 @@ function MenuItem({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={menuStyles.item} onPress={onPress}>
+    <TouchableOpacity
+      style={[menuStyles.item, styles.menuItemRowWeb]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <Text style={menuStyles.icon}>{icon}</Text>
       <Text style={menuStyles.label}>{label}</Text>
       <Text style={menuStyles.detail}>{detail || '›'}</Text>
@@ -279,6 +613,14 @@ const menuStyles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  chevron: {
+    color: isWebDashboard ? webDash.textSecondary : '#718096',
+    fontSize: 12,
+    fontWeight: '600',
+    minWidth: 22,
+    textAlign: 'right',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
 });
 
 const styles = StyleSheet.create({
@@ -293,6 +635,14 @@ const styles = StyleSheet.create({
       default: { padding: 16 },
     }),
   },
+  accordionHeaderWeb: Platform.select({
+    web: { cursor: 'pointer' as const },
+    default: {},
+  }),
+  menuItemRowWeb: Platform.select({
+    web: { cursor: 'pointer' as const },
+    default: {},
+  }),
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -364,70 +714,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  pointsCard: {
-    backgroundColor: C.cardBg,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: isWebDashboard ? webDash.cardBorder : '#F6AD5544',
+  savedNumbersInLottery: {
+    paddingHorizontal: 4,
+    paddingBottom: 4,
   },
-  pointsLabel: {
-    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
-    fontSize: 13,
-    fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  lotterySavedLoading: {
+    marginVertical: 16,
   },
-  pointsValue: {
-    color: '#D97706',
-    fontSize: 37,
-    fontWeight: '700',
-    marginVertical: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  chargeButton: {
-    backgroundColor: isWebDashboard ? 'rgba(0, 163, 131, 0.12)' : '#F6AD5533',
-    borderRadius: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: isWebDashboard ? webDash.accent : '#F6AD55',
-  },
-  chargeText: {
-    color: isWebDashboard ? webDash.accent : '#F6AD55',
-    fontWeight: '600',
-    fontSize: 14,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: C.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
-  },
-  summaryLabel: {
-    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
-    fontSize: 12,
-    fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  summaryValue: {
-    color: C.textPrimary,
-    fontSize: 29,
-    fontWeight: '700',
+  lotterySectionDivider: {
+    borderTopWidth: 1,
+    borderTopColor: isWebDashboard ? webDash.rowBorder : '#2D3748',
     marginTop: 8,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  loadingIndicator: {
-    marginVertical: 20,
+    marginBottom: 0,
   },
   emptyText: {
     color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
@@ -458,11 +756,6 @@ const styles = StyleSheet.create({
     color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 12,
     fontWeight: '500',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  ticketMeta: {
-    color: isWebDashboard ? webDash.textMuted : '#718096',
-    fontSize: 12,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   menuSection: {
@@ -500,6 +793,309 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 20,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  collectionBody: {
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
+  collectionIntro: {
+    color: isWebDashboard ? webDash.textMuted : '#A0AEC0',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+    marginBottom: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  collectionActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  collectionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: isWebDashboard ? '#FFFFFF' : '#1A2744',
+    borderWidth: 1,
+    borderColor: isWebDashboard ? webDash.cardBorder : '#2D3748',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  collectionBtnPrimary: {
+    backgroundColor: isWebDashboard ? webDash.accent : '#3182CE',
+    borderColor: isWebDashboard ? webDash.accent : '#3182CE',
+  },
+  collectionBtnText: {
+    color: isWebDashboard ? webDash.textPrimary : '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  collectionBtnPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  collectionMeta: {
+    color: isWebDashboard ? webDash.textMuted : '#718096',
+    fontSize: 11,
+    marginBottom: 6,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  collectionRemove: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%' as const,
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    backgroundColor: isWebDashboard ? '#FFFFFF' : '#1A2744',
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.textPrimary,
+    marginBottom: 6,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modalHint: {
+    fontSize: 12,
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    marginBottom: 16,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modalFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: isWebDashboard ? webDash.textMuted : '#A0AEC0',
+    marginBottom: 6,
+    marginTop: 10,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  collectionInlineError: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#DC2626',
+    marginTop: 12,
+    marginBottom: 4,
+    lineHeight: 18,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  gamePickRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  gameChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: isWebDashboard ? webDash.cardBorder : '#2D3748',
+    backgroundColor: isWebDashboard ? webDash.cardBg : '#0F1B33',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  gameChipOn: {
+    borderColor: isWebDashboard ? webDash.accent : '#63B3ED',
+    backgroundColor: isWebDashboard ? 'rgba(0, 163, 131, 0.12)' : '#2C5282',
+  },
+  gameChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  gameChipTextOn: {
+    color: isWebDashboard ? webDash.accent : '#FFFFFF',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: isWebDashboard ? webDash.inputBorder : '#2D3748',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: C.textPrimary,
+    backgroundColor: isWebDashboard ? webDash.inputBg : '#0F1B33',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  sourcePickCol: {
+    gap: 6,
+  },
+  sourceRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: isWebDashboard ? webDash.cardBorder : '#2D3748',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  sourceRowOn: {
+    borderColor: isWebDashboard ? webDash.accent : '#63B3ED',
+    backgroundColor: isWebDashboard ? 'rgba(0, 163, 131, 0.08)' : '#2C5282',
+  },
+  sourceRowText: {
+    fontSize: 13,
+    color: isWebDashboard ? webDash.textPrimary : '#E2E8F0',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  sourceRowTextOn: {
+    fontWeight: '600',
+    color: isWebDashboard ? webDash.accent : '#FFFFFF',
+  },
+  whiteInputsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  whiteInput: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: isWebDashboard ? webDash.inputBorder : '#2D3748',
+    borderRadius: 10,
+    paddingVertical: 10,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.textPrimary,
+    backgroundColor: isWebDashboard ? webDash.inputBg : '#0F1B33',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalCancelBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  modalCancelText: {
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modalSaveBtn: {
+    backgroundColor: isWebDashboard ? webDash.accent : '#3182CE',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  modalSaveBtnDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCardWrap: {
+    width: '100%' as const,
+    maxWidth: 380,
+    zIndex: 1,
+  },
+  confirmCard: {
+    borderRadius: 16,
+    padding: 22,
+    backgroundColor: isWebDashboard ? '#FFFFFF' : '#1A2744',
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.textPrimary,
+    marginBottom: 8,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  confirmSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    marginBottom: 16,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  confirmPreview: {
+    backgroundColor: isWebDashboard ? webDash.cardBg : '#0F1B33',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    alignItems: 'center',
+    gap: 10,
+    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+  },
+  confirmPreviewMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: isWebDashboard ? webDash.accent : '#63B3ED',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  confirmBtnSecondary: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: isWebDashboard ? webDash.cardBorder : '#4A5568',
+    backgroundColor: isWebDashboard ? '#FFFFFF' : 'transparent',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  confirmBtnSecondaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: isWebDashboard ? webDash.textPrimary : '#E2E8F0',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  confirmBtnDanger: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: '#DC2626',
+    minWidth: 100,
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  confirmBtnDangerText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
 });

@@ -2,7 +2,7 @@
 // In-app notice for auth screens (web + RN)
 // ============================================
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 export type AuthNoticeVariant = 'success' | 'warning' | 'error' | 'info' | 'pending';
@@ -83,6 +83,8 @@ export interface AuthNoticeBannerProps {
   onDismiss: () => void;
   /** Milliseconds until auto-dismiss; `null` = manual only. Default depends on variant. */
   autoDismissMs?: number | null;
+  /** Merged into the outer banner container (e.g. tighter margins on compact layouts). */
+  containerStyle?: ViewStyle;
 }
 
 export function AuthNoticeBanner({
@@ -91,6 +93,7 @@ export function AuthNoticeBanner({
   message,
   onDismiss,
   autoDismissMs,
+  containerStyle,
 }: AuthNoticeBannerProps) {
   const ms = autoDismissMs === undefined ? defaultAutoDismissMs(variant) : autoDismissMs;
 
@@ -102,7 +105,7 @@ export function AuthNoticeBanner({
 
   return (
     <View
-      style={[styles.wrap, { backgroundColor: VARIANT_BG[variant] }]}
+      style={[styles.wrap, { backgroundColor: VARIANT_BG[variant] }, containerStyle]}
       accessibilityRole="alert"
     >
       <View style={styles.iconCol}>
