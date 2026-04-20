@@ -1,7 +1,7 @@
 // ============================================
-// Home Screen - Dashboard
+// Home Screen - Dashboard (dual-game hero layout)
 // ============================================
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,84 +10,280 @@ import {
   RefreshControl,
   TouchableOpacity,
   Platform,
+  Image,
+  useWindowDimensions,
 } from 'react-native';
 import { LottoRow } from '../components/LottoBall';
 import { StatRow } from '../components/StatCard';
 import { useDraws } from '../hooks/useDraws';
-import { useGame, GameSelector } from '../hooks/useGame';
+import { useGame } from '../hooks/useGame';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
+import { getGameConfig } from '../config/constants';
+import { webDash, webDashboardScrollContent } from '../theme/webDashboard';
+import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
+import type { Draw, GameType } from '../types';
 
 const isWeb = Platform.OS === 'web';
 
-export function HomeScreen({ navigation }: any) {
-  const { game, config } = useGame();
-  const { draws, loading, error, analysis, refresh, latestDraw } = useDraws(game);
+const LOGO = {
+  powerball: require('../../assets/powerball-logo.png'),
+  megamillions: require('../../assets/mega-millions-logo.png'),
+} as const;
 
-  const allAnalysis = analysis?.all;
+function formatLongDrawDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function formatNextDrawLine(d: Date) {
+  return d
+    .toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+    })
+    .toUpperCase();
+}
+
+/** NJ-style white main balls + solid bonus */
+function HeroNumberRow({
+  whites,
+  bonus,
+  bonusHex,
+}: {
+  whites: number[];
+  bonus: number;
+  bonusHex: string;
+}) {
+  return (
+    <View style={heroStyles.ballRow}>
+      {whites.map((n, i) => (
+        <View key={`${n}-${i}`} style={heroStyles.whiteBall}>
+          <Text style={heroStyles.whiteBallText}>{n}</Text>
+        </View>
+      ))}
+      <View style={[heroStyles.bonusBall, { backgroundColor: bonusHex }]}>
+        <Text style={heroStyles.bonusBallText}>{bonus}</Text>
+      </View>
+    </View>
+  );
+}
+
+const heroStyles = StyleSheet.create({
+  ballRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  whiteBall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#1F2937',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  whiteBallText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  bonusBall: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bonusBallText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+});
+
+function LotteryHeroCard({
+  gameType,
+  selected,
+  latestDraw,
+  loading,
+  error,
+  jackpot,
+  onSelect,
+  onPastDrawings,
+}: {
+  gameType: GameType;
+  selected: boolean;
+  latestDraw: Draw | null;
+  loading: boolean;
+  error: string | null;
+  jackpot: LandingJackpotDisplay | null;
+  onSelect: () => void;
+  onPastDrawings: () => void;
+}) {
+  const cfg = getGameConfig(gameType);
+  const isPb = gameType === 'powerball';
+  const bandColor = isPb ? '#B91C1C' : '#1D4ED8';
+  const bonusHex = isPb ? '#DC2626' : '#2563EB';
+
+  return (
+    <View style={[styles.heroCard, selected && styles.heroCardSelected]}>
+      <TouchableOpacity
+        onPress={onSelect}
+        activeOpacity={0.92}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`Select ${cfg.name} for stats below`}
+        style={styles.heroCardBodyTouchable}
+      >
+        <View style={styles.heroCardTop}>
+          <Image source={LOGO[gameType]} style={styles.heroLogo} resizeMode="contain" />
+        </View>
+
+        <View style={[styles.heroJackpotBand, { backgroundColor: bandColor }]}>
+          <Text style={styles.heroJackpotLabel}>ESTIMATED JACKPOT*</Text>
+          <Text style={styles.heroJackpotAmount} numberOfLines={1}>
+            {jackpot?.amountDisplay ?? '—'}
+          </Text>
+          <Text style={styles.heroJackpotHint}>Annuitized; cash option varies by jurisdiction.</Text>
+          <View style={styles.heroNextDrawBox}>
+            <Text style={styles.heroNextDrawLabel}>NEXT DRAW</Text>
+            <Text style={styles.heroNextDrawValue}>
+              {jackpot ? formatNextDrawLine(jackpot.nextDrawDate) : '—'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.heroNumbersSection}>
+          <Text style={styles.heroNumbersCaption}>
+            CURRENT WINNING NUMBERS
+            {latestDraw ? ` (${formatLongDrawDate(latestDraw.draw_date)})` : ''}
+          </Text>
+          {loading ? (
+            <Text style={styles.heroLoading}>Loading…</Text>
+          ) : error ? (
+            <Text style={styles.heroError}>{error}</Text>
+          ) : latestDraw ? (
+            <>
+              <HeroNumberRow
+                whites={[latestDraw.n1, latestDraw.n2, latestDraw.n3, latestDraw.n4, latestDraw.n5]}
+                bonus={latestDraw.powerball}
+                bonusHex={bonusHex}
+              />
+              {latestDraw.powerplay != null && latestDraw.powerplay > 0 ? (
+                <Text style={styles.heroMultiplier}>
+                  {cfg.multiplierLabel?.toUpperCase() ?? 'MULTIPLIER'} ×{latestDraw.powerplay}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Text style={styles.heroLoading}>No draw data</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.heroPastBtn} onPress={onPastDrawings} activeOpacity={0.88}>
+        <Text style={styles.heroPastBtnText}>PAST DRAWINGS</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export function HomeScreen({ navigation }: any) {
+  const { game, setGame } = useGame();
+  const { width } = useWindowDimensions();
+  const stackHero = width < 720;
+
+  const pb = useDraws('powerball');
+  const mm = useDraws('megamillions');
+
+  const [jackpots, setJackpots] = useState<{
+    powerball: LandingJackpotDisplay | null;
+    megamillions: LandingJackpotDisplay | null;
+  } | null>(null);
+
+  const loadJackpots = useCallback(async () => {
+    try {
+      const j = await fetchLandingGameJackpots();
+      setJackpots(j);
+    } catch {
+      setJackpots({ powerball: null, megamillions: null });
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadJackpots();
+  }, [loadJackpots]);
+
+  const loadingBoth = pb.loading || mm.loading;
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([pb.refresh(), mm.refresh(), loadJackpots()]);
+  }, [pb, mm, loadJackpots]);
+
+  const allAnalysis = game === 'powerball' ? pb.analysis?.all : mm.analysis?.all;
+  const draws = game === 'powerball' ? pb.draws : mm.draws;
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, isWeb && webDashboardScrollContent]}
       refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={refresh}
-          tintColor="#63B3ED"
-        />
+        <RefreshControl refreshing={loadingBoth} onRefresh={onRefresh} tintColor="#63B3ED" />
       }
     >
-      {/* Header */}
       {!isWeb && (
         <View style={styles.header}>
           <LottoDreamLogo width={190} />
-          <Text style={styles.tagline}>{config.name} Smart Analysis</Text>
-        </View>
-      )}
-      {isWeb && (
-        <View style={styles.webHeader}>
-          <Text style={styles.webTitle}>{config.name} Smart Analysis</Text>
-          <Text style={styles.webSubtitle}>Latest draws, quick stats, and shortcuts to tools</Text>
+          <Text style={styles.tagline}>Powerball & Mega Millions</Text>
         </View>
       )}
 
-      {/* Game Selector */}
-      <GameSelector light={isWeb} />
-
-      {/* Latest Draw */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Latest Drawing</Text>
-        {latestDraw ? (
-          <>
-            <Text style={styles.drawDate}>
-              {new Date(latestDraw.draw_date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </Text>
-            <View style={styles.ballRow}>
-              <LottoRow
-                whites={[latestDraw.n1, latestDraw.n2, latestDraw.n3, latestDraw.n4, latestDraw.n5]}
-                powerball={latestDraw.powerball}
-                game={game}
-                size={48}
-              />
-            </View>
-            {latestDraw.powerplay && (
-              <Text style={styles.powerplay}>
-                {config.multiplierLabel}: {latestDraw.powerplay}x
-              </Text>
-            )}
-          </>
-        ) : (
-          <Text style={styles.loadingText}>
-            {loading ? 'Loading...' : error || 'No data'}
-          </Text>
-        )}
+      <View
+        style={[
+          styles.dualHeroRow,
+          isWeb && !stackHero ? styles.dualHeroRowWide : styles.dualHeroRowStacked,
+        ]}
+      >
+        <LotteryHeroCard
+          gameType="powerball"
+          selected={game === 'powerball'}
+          latestDraw={pb.latestDraw}
+          loading={pb.loading}
+          error={pb.error}
+          jackpot={jackpots?.powerball ?? null}
+          onSelect={() => setGame('powerball')}
+          onPastDrawings={() => {
+            setGame('powerball');
+            navigation.navigate('History');
+          }}
+        />
+        <LotteryHeroCard
+          gameType="megamillions"
+          selected={game === 'megamillions'}
+          latestDraw={mm.latestDraw}
+          loading={mm.loading}
+          error={mm.error}
+          jackpot={jackpots?.megamillions ?? null}
+          onSelect={() => setGame('megamillions')}
+          onPastDrawings={() => {
+            setGame('megamillions');
+            navigation.navigate('History');
+          }}
+        />
       </View>
 
       {/* Quick Stats */}
@@ -138,7 +334,6 @@ export function HomeScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Hot Numbers */}
       {allAnalysis && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>🔥 Hot Numbers (All Time)</Text>
@@ -152,7 +347,6 @@ export function HomeScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Cold Numbers */}
       {allAnalysis && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>❄️ Cold Numbers (All Time)</Text>
@@ -166,27 +360,19 @@ export function HomeScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* CTA Buttons */}
       <View style={styles.ctaContainer}>
-        <TouchableOpacity
-          style={styles.ctaPrimary}
-          onPress={() => navigation.navigate('Predict')}
-        >
+        <TouchableOpacity style={styles.ctaPrimary} onPress={() => navigation.navigate('Predict')}>
           <Text style={styles.ctaPrimaryText}>🎯 Get Smart Picks</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.ctaSecondary}
-          onPress={() => navigation.navigate('Analysis')}
-        >
+        <TouchableOpacity style={styles.ctaSecondary} onPress={() => navigation.navigate('Analysis')}>
           <Text style={styles.ctaSecondaryText}>📊 Full Analysis</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Recent Draws */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Recent Drawings</Text>
+        <Text style={styles.cardTitle}>Recent Drawings ({getGameConfig(game).name})</Text>
         {draws.slice(0, 10).map((draw, i) => (
-          <View key={i} style={styles.recentDraw}>
+          <View key={`${draw.draw_date}-${i}`} style={styles.recentDraw}>
             <Text style={styles.recentDate}>
               {new Date(draw.draw_date).toLocaleDateString('en-US', {
                 month: 'short',
@@ -213,14 +399,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     ...Platform.select({
-      web: { backgroundColor: '#FFFFFF' },
+      web: { backgroundColor: webDash.screenBg },
       default: { backgroundColor: '#0B1426' },
     }),
   },
   content: {
     paddingBottom: 40,
     ...Platform.select({
-      web: { paddingHorizontal: 0, paddingTop: 12 },
+      web: { paddingHorizontal: 0, paddingTop: 72 },
       default: { padding: 16 },
     }),
   },
@@ -228,43 +414,191 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 20,
   },
-  webHeader: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 4,
-  },
-  webTitle: {
-    fontSize: 22,
+  tagline: {
+    fontSize: 28,
     fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  webSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
+    color: '#FFFFFF',
     textAlign: 'center',
     marginTop: 8,
-    maxWidth: 520,
-    lineHeight: 20,
+    marginBottom: 16,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  tagline: {
+  dualHeroRow: {
+    gap: 12,
+    marginBottom: 8,
+  },
+  dualHeroRowWide: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 32,
+  },
+  dualHeroRowStacked: {
+    flexDirection: 'column',
+  },
+  heroCard: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 0,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: webDash.cardBorder,
+    ...Platform.select({
+      web: {
+        boxShadow: webDash.shadowCard,
+      } as object,
+      default: {
+        marginBottom: 12,
+        width: '100%' as const,
+      },
+    }),
+  },
+  heroCardSelected: {
+    borderColor: webDash.accent,
+    borderWidth: 2,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 0 0 3px rgba(0, 163, 131, 0.2), 0 12px 28px -10px rgba(15, 23, 42, 0.15)',
+      } as object,
+      default: {},
+    }),
+  },
+  heroCardBodyTouchable: {
+    flexShrink: 0,
+  },
+  heroCardTop: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  heroLogo: {
+    width: '100%',
+    height: 44,
+    maxWidth: 220,
+  },
+  heroJackpotBand: {
+    paddingHorizontal: 14,
+    paddingTop: 16,
+    paddingBottom: 14,
+  },
+  heroJackpotLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: 'rgba(255,255,255,0.92)',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroJackpotAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 6,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroJackpotHint: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 6,
+    lineHeight: 14,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroNextDrawBox: {
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  heroNextDrawLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#64748B',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroNextDrawValue: {
     fontSize: 13,
-    color: '#A0AEC0',
+    fontWeight: '800',
+    color: '#111827',
     marginTop: 4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  heroNumbersSection: {
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  heroNumbersCaption: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: 0.3,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroLoading: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#64748B',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroError: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#DC2626',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroMultiplier: {
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  heroPastBtn: {
+    ...Platform.select({
+      web: {
+        backgroundColor: '#0F172A',
+        borderTopWidth: 0,
+      },
+      default: {
+        backgroundColor: '#FACC15',
+        borderTopWidth: 1,
+        borderTopColor: '#EAB308',
+      },
+    }),
+    paddingVertical: 14,
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+  },
+  heroPastBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    ...Platform.select({
+      web: { color: '#F8FAFC' },
+      default: { color: '#14532D' },
+    }),
+  },
   card: {
-    borderRadius: 16,
+    borderRadius: webDash.radiusLg,
     padding: 18,
     marginVertical: 8,
     ...Platform.select({
       web: {
-        backgroundColor: '#F8FAFC',
+        backgroundColor: webDash.cardBg,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-      },
+        borderColor: webDash.cardBorder,
+        boxShadow: webDash.shadowCard,
+      } as object,
       default: {
         backgroundColor: '#1A2744',
       },
@@ -272,51 +606,26 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 12,
     ...Platform.select({
       web: {
-        color: '#111827',
+        color: webDash.textPrimary,
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       },
       default: { color: '#FFFFFF' },
     }),
   },
-  drawDate: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 12,
-    ...Platform.select({
-      web: { color: '#64748B', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-      default: { color: '#A0AEC0' },
-    }),
-  },
-  ballRow: {
-    alignItems: 'center',
-  },
-  powerplay: {
-    fontSize: 14,
-    color: '#F6AD55',
-    textAlign: 'center',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  loadingText: {
-    textAlign: 'center',
-    fontSize: 15,
-    ...Platform.select({
-      web: { color: '#64748B' },
-      default: { color: '#718096' },
-    }),
-  },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginTop: 20,
+    marginBottom: 12,
+    textTransform: 'uppercase' as const,
     ...Platform.select({
       web: {
-        color: '#111827',
+        color: webDash.textMuted,
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       },
       default: { color: '#FFFFFF' },

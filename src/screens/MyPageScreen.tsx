@@ -1,8 +1,8 @@
 // ============================================
 // My Page Screen - User profile & settings
 // ============================================
-import React, { useState, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -16,7 +16,9 @@ import {
   TextInput,
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
+import { useEntitlement } from '../hooks/useEntitlement';
 import { getProfile, signOut } from '../services/authService';
+import { PREMIUM_PRICE_DISPLAY } from '../config/constants';
 import {
   getSavedNumberSets,
   getNumberCollectionItems,
@@ -29,7 +31,7 @@ import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { AppFeedbackModal, type AppFeedbackVariant } from '../components/AppFeedbackModal';
 import { LottoRow } from '../components/LottoBall';
 import { GameType, NumberCollectionItem, SavedNumberSet, UserProfile } from '../types';
-import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+import { isWebDashboard, webDash, nativeDash, webDashboardScrollContent } from '../theme/webDashboard';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
 
 const C = isWebDashboard ? webDash : nativeDash;
@@ -40,8 +42,22 @@ const SOURCE_LABELS: Record<NumberCollectionSource, string> = {
   history_watch: '📜 History / draws',
 };
 
+type MyPageRouteParams = {
+  focus?:
+    | 'saved'
+    | 'collection'
+    | 'faq'
+    | 'support'
+    | 'account'
+    | 'password'
+    | 'payment'
+    | 'upgrade';
+};
+
 export function MyPageScreen({ navigation }: any) {
   const { user } = useAuth();
+  const { isPremium } = useEntitlement();
+  const route = useRoute();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [savedNumbers, setSavedNumbers] = useState<SavedNumberSet[]>([]);
   const [collectionItems, setCollectionItems] = useState<NumberCollectionItem[]>([]);
@@ -64,6 +80,59 @@ export function MyPageScreen({ navigation }: any) {
     variant: AppFeedbackVariant;
   } | null>(null);
   const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
+
+  useEffect(() => {
+    const focus = (route.params as MyPageRouteParams | undefined)?.focus;
+    if (!focus) return;
+
+    if (focus === 'saved') {
+      setSavedNumbersOpen(true);
+      setNumberCollectionOpen(false);
+    } else if (focus === 'collection') {
+      setNumberCollectionOpen(true);
+      setSavedNumbersOpen(false);
+    } else if (focus === 'account') {
+      setSavedNumbersOpen(false);
+      setNumberCollectionOpen(false);
+    } else if (focus === 'faq') {
+      setAlertFeedback({
+        variant: 'info',
+        title: 'FAQ',
+        message: 'Help topics are coming soon. Check back shortly.',
+      });
+    } else if (focus === 'support') {
+      setAlertFeedback({
+        variant: 'info',
+        title: 'Customer support',
+        message: 'For assistance, please use the contact options in your app store listing or official site.',
+      });
+    } else if (focus === 'password') {
+      setAlertFeedback({
+        variant: 'info',
+        title: 'Change password',
+        message:
+          'Sign out and use “Forgot password?” on the login screen, or the reset link from your email. In-app password updates will be added later.',
+      });
+    } else if (focus === 'payment') {
+      setAlertFeedback({
+        variant: 'info',
+        title: 'Payment method',
+        message: 'Saved payment methods will be available in a future update.',
+      });
+    } else if (focus === 'upgrade') {
+      try {
+        navigation?.navigate?.('Pricing');
+      } catch {
+        setAlertFeedback({
+          variant: 'info',
+          title: 'Premium',
+          message: 'Open the Pricing tab from the menu to upgrade.',
+        });
+      }
+    }
+
+    navigation.setParams({ focus: undefined } as never);
+  }, [route.params, navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -223,7 +292,10 @@ export function MyPageScreen({ navigation }: any) {
 
   return (
     <>
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, isWebDashboard && webDashboardScrollContent]}
+    >
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
@@ -233,13 +305,54 @@ export function MyPageScreen({ navigation }: any) {
         </View>
         <Text style={styles.username}>{profile?.username || 'User'}</Text>
         <Text style={styles.email}>{user.email}</Text>
+        <View
+          style={[
+            styles.planPill,
+            isPremium ? styles.planPillPremium : styles.planPillBasic,
+          ]}
+        >
+          <Text
+            style={[
+              styles.planPillText,
+              isPremium ? styles.planPillTextPremium : styles.planPillTextBasic,
+            ]}
+          >
+            {isPremium ? '★ Premium member' : 'Free plan'}
+          </Text>
+        </View>
       </View>
+
+      {/* Upgrade card — only for non-premium users */}
+      {!isPremium && (
+        <TouchableOpacity
+          style={styles.upgradeCard}
+          onPress={() => navigation.navigate('Pricing')}
+          activeOpacity={0.9}
+        >
+          <View style={styles.upgradeCardLeft}>
+            <Text style={styles.upgradeCardEyebrow}>UNLOCK</Text>
+            <Text style={styles.upgradeCardTitle}>
+              All 5 AI prediction modes
+            </Text>
+            <Text style={styles.upgradeCardSub}>
+              One-time {PREMIUM_PRICE_DISPLAY} • no subscription
+            </Text>
+          </View>
+          <View style={styles.upgradeCardCta}>
+            <Text style={styles.upgradeCardCtaText}>Upgrade</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Menu Items */}
       <View style={styles.menuSection}>
         <Text style={styles.menuTitle}>Account</Text>
         <MenuItem icon="✏️" label="Edit Profile" onPress={() => {}} />
-        <MenuItem icon="💳" label="Payment Methods" onPress={() => {}} />
+        <MenuItem
+          icon="💳"
+          label={isPremium ? 'Billing & receipts' : 'Pricing & plans'}
+          onPress={() => navigation.navigate('Pricing')}
+        />
       </View>
 
       <View style={styles.menuSection}>
@@ -342,10 +455,30 @@ export function MyPageScreen({ navigation }: any) {
 
       <View style={styles.menuSection}>
         <Text style={styles.menuTitle}>Support</Text>
-        <MenuItem icon="❓" label="FAQ" onPress={() => {}} />
-        <MenuItem icon="💬" label="Customer Support" onPress={() => {}} />
-        <MenuItem icon="📄" label="Terms of Service" onPress={() => {}} />
-        <MenuItem icon="🔒" label="Privacy Policy" onPress={() => {}} />
+        <MenuItem
+          icon="❓"
+          label="FAQ"
+          onPress={() =>
+            setAlertFeedback({
+              variant: 'info',
+              title: 'FAQ',
+              message: 'Help topics are coming soon. Check back shortly.',
+            })
+          }
+        />
+        <MenuItem
+          icon="💬"
+          label="Customer Support"
+          onPress={() =>
+            setAlertFeedback({
+              variant: 'info',
+              title: 'Customer support',
+              message: 'For assistance, please use the contact options in your app store listing or official site.',
+            })
+          }
+        />
+        <MenuItem icon="📄" label="Terms of Service" onPress={() => navigation.navigate('TermsOfService')} />
+        <MenuItem icon="🔒" label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />
       </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -712,6 +845,84 @@ const styles = StyleSheet.create({
     color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
     fontSize: 14,
     marginTop: 4,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  planPill: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  planPillBasic: {
+    backgroundColor: isWebDashboard ? webDash.cardBgMuted : '#1F2A44',
+    borderColor: isWebDashboard ? webDash.cardBorder : '#2D3748',
+  },
+  planPillPremium: {
+    backgroundColor: isWebDashboard ? 'rgba(234, 179, 8, 0.12)' : 'rgba(250, 204, 21, 0.15)',
+    borderColor: isWebDashboard ? 'rgba(234, 179, 8, 0.5)' : '#FACC15',
+  },
+  planPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase' as const,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  planPillTextBasic: {
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+  },
+  planPillTextPremium: {
+    color: isWebDashboard ? '#92400E' : '#FACC15',
+  },
+  upgradeCard: {
+    marginTop: 18,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: isWebDashboard ? 'rgba(234, 179, 8, 0.5)' : '#7B61FF',
+    backgroundColor: isWebDashboard ? 'rgba(254, 252, 232, 0.9)' : '#2D1B69',
+    ...(isWebDashboard
+      ? ({
+          boxShadow:
+            '0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 24px -12px rgba(180, 83, 9, 0.18)',
+          cursor: 'pointer' as const,
+        } as object)
+      : {}),
+  },
+  upgradeCardLeft: { flex: 1, gap: 4 },
+  upgradeCardEyebrow: {
+    color: isWebDashboard ? '#B45309' : '#FDE68A',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  upgradeCardTitle: {
+    color: isWebDashboard ? '#92400E' : '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  upgradeCardSub: {
+    color: isWebDashboard ? '#78350F' : '#CBD5E1',
+    fontSize: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  upgradeCardCta: {
+    backgroundColor: isWebDashboard ? '#B45309' : '#7B61FF',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  upgradeCardCtaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   savedNumbersInLottery: {

@@ -108,6 +108,32 @@ export interface UserProfile {
   points: number;
   referral_code?: string;
   created_at: string;
+  /** 'basic' (free) or 'premium' (one-time $4.99 unlock). Backed by profiles.subscription_tier. */
+  subscription_tier?: SubscriptionTier;
+  /** Timestamp when premium was activated (Stripe webhook / IAP receipt). */
+  premium_since?: string | null;
+  /** Which provider granted premium, for receipt display. */
+  premium_source?: PremiumSource | null;
+}
+
+export type SubscriptionTier = 'basic' | 'premium';
+
+export type PremiumSource = 'stripe' | 'apple_iap' | 'google_iap' | 'manual';
+
+/** Prediction modes that require a premium unlock. */
+export const PREMIUM_PREDICTION_MODES: readonly PredictionMode[] = [
+  'hot',
+  'cold',
+  'balanced',
+  'anticrowd',
+  'lucky',
+] as const;
+
+/** The one mode that stays free forever. */
+export const FREE_PREDICTION_MODES: readonly PredictionMode[] = ['random'] as const;
+
+export function isPremiumMode(mode: PredictionMode): boolean {
+  return (PREMIUM_PREDICTION_MODES as readonly PredictionMode[]).includes(mode);
 }
 
 /** Purchase/ticket record */

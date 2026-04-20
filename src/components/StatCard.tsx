@@ -2,7 +2,8 @@
 // Stats Card Component
 // ============================================
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { isWebDashboard, webDash } from '../theme/webDashboard';
 
 interface StatCardProps {
   label: string;
@@ -13,10 +14,10 @@ interface StatCardProps {
 
 export function StatCard({ label, value, subtitle, color = '#3182CE' }: StatCardProps) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={[styles.value, { color }]}>{value}</Text>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+    <View style={[styles.card, isWebDashboard && styles.cardWeb]}>
+      <Text style={[styles.label, isWebDashboard && styles.labelWeb]}>{label}</Text>
+      <Text style={[styles.value, isWebDashboard && styles.valueWeb, { color }]}>{value}</Text>
+      {subtitle && <Text style={[styles.subtitle, isWebDashboard && styles.subtitleWeb]}>{subtitle}</Text>}
     </View>
   );
 }
@@ -48,6 +49,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  cardWeb: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: webDash.cardBorder,
+    marginHorizontal: 8,
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+        } as object)
+      : {}),
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  labelWeb: {
+    fontSize: 14,
+  },
+  valueWeb: {
+    fontSize: 28,
+  },
+  subtitleWeb: {
+    fontSize: 13,
   },
   label: {
     fontSize: 12,

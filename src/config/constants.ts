@@ -97,3 +97,36 @@ export const GAME_CONFIGS: Record<GameType, GameConfig> = {
 export function getGameConfig(game: GameType): GameConfig {
   return GAME_CONFIGS[game];
 }
+
+// ============================================
+// Monetization — one-time Premium unlock
+// ============================================
+
+/** Product identifier used across Stripe / App Store Connect / Google Play Console. */
+export const PREMIUM_PRODUCT_ID = 'premium_unlock';
+
+/** User-facing price in cents. Matches Stripe Price + store products. */
+export const PREMIUM_PRICE_CENTS = 499;
+export const PREMIUM_CURRENCY = 'USD';
+
+/** Formatted price used in marketing copy and CTAs. */
+export const PREMIUM_PRICE_DISPLAY = '$4.99';
+
+/**
+ * Stripe Checkout URL for the premium unlock.
+ * Create a Payment Link in Stripe Dashboard -> Products, then set this env.
+ * Fallback keeps the CTA visible in development without crashing.
+ */
+export const STRIPE_PREMIUM_CHECKOUT_URL =
+  process.env.EXPO_PUBLIC_STRIPE_PREMIUM_URL ||
+  'https://billing.lottodream.app/premium';
+
+/** Support email surfaced in legal text and receipts. */
+export const SUPPORT_EMAIL =
+  process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'support@lottodream.app';
+
+/** Legal entity name used in Terms / Privacy. */
+export const LEGAL_ENTITY = 'LottoDream';
+
+/** Used for "Last updated" on policy docs — single source of truth. */
+export const LEGAL_LAST_UPDATED = 'April 18, 2026';

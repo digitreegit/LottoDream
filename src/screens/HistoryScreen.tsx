@@ -16,7 +16,7 @@ import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { Draw } from '../types';
-import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+import { isWebDashboard, webDash, nativeDash, webDashboardScrollContent } from '../theme/webDashboard';
 
 const C = isWebDashboard ? webDash : nativeDash;
 
@@ -74,16 +74,23 @@ export function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🏆 Drawing</Text>
+      <View style={styles.pageIntro}>
+        <Text style={styles.eyebrow}>Archive</Text>
+        <Text style={styles.title}>Drawing results</Text>
+        <Text style={styles.lede}>
+          Full draw history with quick number search — comma or space separated.
+        </Text>
+      </View>
 
       {/* Game Selector */}
       <GameSelector light={isWebDashboard} />
 
       {/* Search */}
-      <View style={styles.searchContainer}>
+      <View style={styles.searchCard}>
+        <Text style={styles.searchLabel}>Filter by numbers</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by number (e.g. 7 14 21)"
+          placeholder="e.g. 7 14 21 or 7, 14, 21"
           placeholderTextColor={isWebDashboard ? '#94A3B8' : '#718096'}
           value={search}
           onChangeText={setSearch}
@@ -91,19 +98,20 @@ export function HistoryScreen() {
         />
         {search.length > 0 && (
           <Text style={styles.searchResult}>
-            {filtered.length} matches found
+            {filtered.length} match{filtered.length === 1 ? '' : 'es'}
           </Text>
         )}
       </View>
 
       <FlatList
+        style={styles.flatList}
         data={filtered}
         keyExtractor={(item) => item.draw_date}
         renderItem={renderDraw}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#63B3ED" />
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, isWebDashboard && webDashboardScrollContent]}
         ListEmptyComponent={
           <Text style={styles.empty}>
             {loading ? 'Loading draws...' : 'No draws found'}
@@ -120,27 +128,79 @@ export function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: C.screenBg,
+    minHeight: 0,
+    backgroundColor: isWebDashboard ? webDash.screenBg : C.screenBg,
+  },
+  flatList: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+  },
+  pageIntro: {
+    paddingTop: 8,
+    marginBottom: 8,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    color: isWebDashboard ? webDash.accent : '#63B3ED',
+    textTransform: 'uppercase' as const,
+    marginBottom: 8,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    ...(!isWebDashboard ? { textAlign: 'center' as const } : {}),
   },
   title: {
-    fontSize: 27,
+    fontSize: 26,
     fontWeight: '800',
     color: C.textPrimary,
-    textAlign: 'center',
-    paddingTop: 16,
-    paddingBottom: 8,
+    textAlign: isWebDashboard ? ('left' as const) : ('center' as const),
+    marginBottom: 10,
+    letterSpacing: -0.4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  searchContainer: {
-    paddingHorizontal: isWebDashboard ? 0 : 16,
+  lede: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    textAlign: isWebDashboard ? ('left' as const) : ('center' as const),
+    marginBottom: 4,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  searchCard: {
+    paddingHorizontal: isWebDashboard ? 14 : 16,
+    paddingVertical: isWebDashboard ? 14 : 12,
+    marginBottom: 12,
+    borderRadius: isWebDashboard ? webDash.radiusLg : 14,
+    ...(isWebDashboard
+      ? {
+          backgroundColor: webDash.cardBg,
+          borderWidth: 1,
+          borderColor: webDash.cardBorder,
+          boxShadow: webDash.shadowCard,
+        }
+      : {
+          backgroundColor: 'transparent',
+        }),
+  },
+  searchLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: isWebDashboard ? webDash.textMuted : '#718096',
+    textTransform: 'uppercase' as const,
     marginBottom: 8,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   searchInput: {
-    backgroundColor: isWebDashboard ? webDash.inputBg : '#1A2744',
+    backgroundColor: isWebDashboard ? webDash.cardBgMuted : '#1A2744',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     color: isWebDashboard ? webDash.textPrimary : '#FFFFFF',
     borderWidth: 1,
     borderColor: isWebDashboard ? webDash.inputBorder : '#2D3748',
@@ -149,8 +209,8 @@ const styles = StyleSheet.create({
   searchResult: {
     color: isWebDashboard ? webDash.accent : '#63B3ED',
     fontSize: 13,
-    marginTop: 4,
-    marginLeft: 4,
+    marginTop: 10,
+    fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   list: {
@@ -162,13 +222,15 @@ const styles = StyleSheet.create({
     }),
   },
   drawItem: {
-    backgroundColor: C.cardBg,
-    borderRadius: 12,
-    padding: 14,
-    marginVertical: 4,
+    backgroundColor: isWebDashboard ? webDash.cardBg : C.cardBg,
+    borderRadius: isWebDashboard ? webDash.radiusMd : 12,
+    padding: 16,
+    marginVertical: 6,
     alignItems: 'center',
-    gap: 8,
-    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+    gap: 10,
+    ...(isWebDashboard
+      ? { borderWidth: 1, borderColor: webDash.cardBorder, boxShadow: webDash.shadowCard }
+      : {}),
   },
   drawInfo: {
     flexDirection: 'row',

@@ -4,6 +4,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { LEGAL_ENTITY, LEGAL_LAST_UPDATED, SUPPORT_EMAIL } from '../config/constants';
 
 const BACK_CHEVRON_COLOR = '#00A383';
 
@@ -41,81 +42,144 @@ export function PrivacyPolicyScreen({ navigation }: any) {
         showsVerticalScrollIndicator={Platform.OS !== 'web'}
       >
         <Text style={styles.title}>Privacy Policy</Text>
-        <Text style={styles.updated}>Last updated: April 15, 2026</Text>
+        <Text style={styles.updated}>Last updated: {LEGAL_LAST_UPDATED}</Text>
 
         <Text style={styles.p}>
-          This Privacy Policy describes how LottoDream (&quot;we&quot;, &quot;us&quot;) collects, uses, and
-          shares information when you use our website and mobile applications (the &quot;Service&quot;).
+          This Privacy Policy explains how {LEGAL_ENTITY} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;)
+          collects, uses, shares, and protects information when you use our website and
+          mobile applications (the &quot;Service&quot;). By using the Service, you agree to
+          this Policy. If you do not agree, please do not use the Service.
         </Text>
 
         <Text style={styles.h2}>1. Information we collect</Text>
         <Text style={styles.p}>
-          We may collect information you provide directly (such as email address when you create an
-          account), authentication data when you sign in (including through third-party providers like
-          Google), and technical data such as device type, operating system, and approximate location
-          derived from IP address where applicable.
+          <Text style={styles.strong}>Account data.</Text> When you create an account we
+          collect your email address, username, and, if you use Google Sign-In, the
+          basic profile information Google returns (name, email, avatar URL).
+        </Text>
+        <Text style={styles.p}>
+          <Text style={styles.strong}>App activity.</Text> We store information you create
+          in the app, including saved number sets, prediction history, selected game
+          (Powerball / Mega Millions), and preferences.
+        </Text>
+        <Text style={styles.p}>
+          <Text style={styles.strong}>Payment data.</Text> When you purchase the Premium
+          unlock, the card number and CVC are entered directly into our payment
+          processor (Stripe on web; Apple / Google for in-app purchases) and are never
+          sent to our servers. We receive a transaction ID, the last four digits of
+          your card, the amount, and the status of the payment for accounting and
+          receipt purposes.
+        </Text>
+        <Text style={styles.p}>
+          <Text style={styles.strong}>Device & usage data.</Text> IP address, device and
+          OS type, app version, language, crash logs, and basic analytics events
+          (screens viewed, features used). We do not collect precise GPS location.
         </Text>
 
         <Text style={styles.h2}>2. How we use information</Text>
         <Text style={styles.p}>
-          We use information to provide and improve the Service, authenticate users, communicate with
-          you about your account or security, analyze usage in aggregate, and comply with legal
-          obligations.
+          We use information to (a) operate and secure the Service and your account;
+          (b) deliver Premium entitlements and related receipts; (c) detect fraud,
+          abuse, and policy violations; (d) improve the Service, including training
+          and evaluating our statistical prediction models on aggregated, non-identifying
+          data; (e) communicate about transactions, security, and legally required
+          notices; and (f) comply with legal obligations.
+        </Text>
+        <Text style={styles.p}>
+          We do <Text style={styles.strong}>not</Text> use your personal information to
+          target behavioral advertising, and we do not sell it.
         </Text>
 
-        <Text style={styles.h2}>3. Sharing</Text>
+        <Text style={styles.h2}>3. Legal bases (EEA / UK users)</Text>
         <Text style={styles.p}>
-          We may share information with service providers who assist us (for example, hosting or
-          authentication infrastructure), when required by law, or to protect rights and safety. We do
-          not sell your personal information.
+          Where GDPR / UK GDPR apply, we rely on: performance of a contract (to provide
+          the Service you signed up for), our legitimate interests (security, product
+          improvement, fraud prevention), consent (where required, e.g., optional
+          analytics), and legal obligations.
         </Text>
 
-        <Text style={styles.h2}>4. Cookies and similar technologies</Text>
+        <Text style={styles.h2}>4. How we share information</Text>
         <Text style={styles.p}>
-          On the web, we may use cookies or local storage as needed for sign-in sessions and basic
-          preferences. You can control cookies through your browser settings where supported.
+          We share information only with service providers acting on our behalf, and
+          only for the purposes described above:
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.strong}>Supabase / hosting providers</Text> — database,
+          authentication, and infrastructure.{'\n'}
+          • <Text style={styles.strong}>Stripe, Inc.</Text> — web payments and receipts.
+          {'\n'}
+          • <Text style={styles.strong}>Apple / Google</Text> — in-app purchases (when
+          offered).{'\n'}
+          • <Text style={styles.strong}>NY Open Data / state lottery sources</Text> — we
+          consume public draw data; we do not share your account data with them.{'\n'}
+          • <Text style={styles.strong}>Law-enforcement or regulators</Text> — if we are
+          legally required, or to protect rights and safety.
         </Text>
 
-        <Text style={styles.h2}>5. Data retention</Text>
+        <Text style={styles.h2}>5. Cookies & similar technologies (web)</Text>
         <Text style={styles.p}>
-          We retain information for as long as necessary to provide the Service and for legitimate
-          business purposes, unless a longer period is required by law.
+          On the web we use strictly-necessary cookies / local storage to keep you
+          signed in and remember preferences. We do not use third-party advertising
+          cookies. You can clear cookies via your browser at any time.
         </Text>
 
-        <Text style={styles.h2}>6. Security</Text>
+        <Text style={styles.h2}>6. Data retention</Text>
         <Text style={styles.p}>
-          We implement reasonable safeguards designed to protect your information. No method of
-          transmission or storage is completely secure.
+          We retain account and app-activity data while your account is active. If
+          you delete your account, we remove personal identifiers within 30 days,
+          except where we must retain certain records for tax, accounting, or
+          fraud-prevention reasons (typically 7 years for payment records). Aggregated
+          and de-identified data may be kept indefinitely.
         </Text>
 
-        <Text style={styles.h2}>7. Your choices</Text>
+        <Text style={styles.h2}>7. Security</Text>
         <Text style={styles.p}>
-          Depending on your location, you may have rights to access, correct, or delete certain personal
-          information. Contact us to make a request; we may need to verify your identity.
+          We use TLS in transit, managed database encryption at rest, row-level
+          security for per-user data isolation, and hashed / tokenized credentials.
+          No system is 100% secure; we encourage strong unique passwords and the use
+          of your platform&apos;s biometric or OS-level protections.
         </Text>
 
-        <Text style={styles.h2}>8. Children</Text>
+        <Text style={styles.h2}>8. Your rights & choices</Text>
         <Text style={styles.p}>
-          The Service is not directed to children under the age of majority in their jurisdiction. We do
-          not knowingly collect personal information from children.
+          Depending on where you live, you may have rights to access, correct, delete,
+          port, or restrict processing of your personal data, and to object to certain
+          processing. You can delete your account from the My Page screen, or email{' '}
+          {SUPPORT_EMAIL}. We may ask you to verify your identity before responding.
+          California residents have additional rights under the CCPA / CPRA
+          (right to know, delete, correct, and opt-out of &quot;sharing&quot; — we do
+          not &quot;sell&quot; or &quot;share&quot; personal information as defined by
+          that law).
         </Text>
 
-        <Text style={styles.h2}>9. International users</Text>
+        <Text style={styles.h2}>9. Children</Text>
         <Text style={styles.p}>
-          If you use the Service from outside the country where we operate, your information may be
-          processed in countries with different data protection laws.
+          The Service is intended for adults aged 18+ (or the legal gambling age in
+          your jurisdiction, if higher). We do not knowingly collect personal
+          information from children under 13, and we do not direct the Service to
+          them. If you believe a child provided us personal information, contact{' '}
+          {SUPPORT_EMAIL} and we will delete it.
         </Text>
 
-        <Text style={styles.h2}>10. Changes</Text>
+        <Text style={styles.h2}>10. International transfers</Text>
         <Text style={styles.p}>
-          We may update this policy from time to time. We will post the updated policy and revise the
-          &quot;Last updated&quot; date.
+          We operate from, and store data in, the United States. If you access the
+          Service from outside the US, your information will be transferred to and
+          processed in the US under appropriate safeguards (e.g., Standard Contractual
+          Clauses where required).
         </Text>
 
-        <Text style={styles.h2}>11. Contact</Text>
+        <Text style={styles.h2}>11. Changes</Text>
         <Text style={styles.p}>
-          For privacy-related questions, contact us using the support channel described in the app or on
-          our website.
+          We may update this Policy from time to time. When we do, we update the
+          &quot;Last updated&quot; date and, for material changes, provide a more
+          prominent in-app notice. Continued use after the effective date constitutes
+          acceptance.
+        </Text>
+
+        <Text style={styles.h2}>12. Contact</Text>
+        <Text style={styles.p}>
+          Questions, requests, or complaints? Email {SUPPORT_EMAIL}.
         </Text>
       </ScrollView>
     </View>
@@ -182,6 +246,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#374151',
+    marginBottom: 10,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  strong: {
+    fontWeight: '700',
+    color: '#111827',
   },
 });

@@ -2,10 +2,15 @@
 // Navigation Setup
 // ============================================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  useNavigationContainerRef,
+  type NavigationContainerRef,
+} from '@react-navigation/native';
+import type { User } from '@supabase/supabase-js';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, Linking } from 'react-native';
+import { Platform, Linking, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useAuth } from '../hooks/useAuth';
@@ -20,9 +25,12 @@ import { AnalysisScreen } from '../screens/AnalysisScreen';
 import { PredictScreen } from '../screens/PredictScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { MyPageScreen } from '../screens/MyPageScreen';
+import { PricingScreen } from '../screens/PricingScreen';
 import { WebLandingPage } from '../screens/WebLandingPage';
-import { WebLayout } from '../components/WebLayout';
+import { WebLayout, type WebMenuKey, type WebUserMenuAction } from '../components/WebLayout';
+import { webDash } from '../theme/webDashboard';
 import { supabase } from '../config/supabase';
+import { getProfile, signOut } from '../services/authService';
 
 const Stack = createNativeStackNavigator();
 const AuthStackNav = createNativeStackNavigator();
@@ -209,7 +217,137 @@ function MainTabs() {
           tabBarIcon: ({ color }) => <UserIcon color={color} />,
         }}
       />
+      <Tab.Screen
+        name="Pricing"
+        component={PricingScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen
+        name="TermsOfService"
+        component={TermsOfServiceScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{ tabBarButton: () => null }}
+      />
     </Tab.Navigator>
+  );
+}
+
+function LoggedInWebShell({
+  user,
+  webNavRef,
+  webActiveMenu,
+  setWebActiveMenu,
+}: {
+  user: User;
+  webNavRef: React.RefObject<NavigationContainerRef<any> | null>;
+  webActiveMenu: WebMenuKey;
+  setWebActiveMenu: (m: WebMenuKey) => void;
+}) {
+  const [accountPlanTier, setAccountPlanTier] = useState<'basic' | 'premium'>('basic');
+
+  useEffect(() => {
+    let cancelled = false;
+    void getProfile().then((p) => {
+      if (cancelled) return;
+      setAccountPlanTier(p?.subscription_tier === 'premium' ? 'premium' : 'basic');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
+
+  const handleWebMenuPress = (menu: WebMenuKey) => {
+    setWebActiveMenu(menu);
+    const targetRoute = menu === 'Drawing' ? 'History' : menu;
+    webNavRef.current?.navigate(targetRoute);
+  };
+
+  const handleLogoPress = () => {
+    setWebActiveMenu('Home');
+    webNavRef.current?.navigate('Home');
+  };
+
+  const handleAccountMenuAction = useCallback(
+    (key: WebUserMenuAction) => {
+      switch (key) {
+        case 'dashboard':
+          webNavRef.current?.navigate('MyPage', { focus: 'saved' });
+          break;
+        case 'account-settings':
+          webNavRef.current?.navigate('MyPage', { focus: 'account' });
+          break;
+        case 'upgrade-premium':
+          setWebActiveMenu('Pricing');
+          webNavRef.current?.navigate('Pricing');
+          break;
+        default:
+          break;
+      }
+    },
+    [webNavRef]
+  );
+
+  const handleAccountSignOut = useCallback(async () => {
+    await signOut();
+  }, []);
+
+  return (
+    <WebLayout
+      activeMenu={webActiveMenu}
+      onMenuPress={handleWebMenuPress}
+      onLogoPress={handleLogoPress}
+      accountHeaderMenu={{
+        userEmail: user.email ?? '',
+        planTier: accountPlanTier,
+        onAction: handleAccountMenuAction,
+        onSignOut: handleAccountSignOut,
+      }}
+    >
+      <View style={{ flex: 1, minHeight: 0, width: '100%', alignSelf: 'stretch' }}>
+        <NavigationContainer
+          ref={webNavRef}
+          onStateChange={() => {
+            const routeName = webNavRef.current?.getCurrentRoute()?.name;
+            if (
+              routeName === 'Home' ||
+              routeName === 'Analysis' ||
+              routeName === 'Predict' ||
+              routeName === 'Pricing'
+            ) {
+              setWebActiveMenu(routeName);
+            }
+            if (routeName === 'History') {
+              setWebActiveMenu('Drawing');
+            }
+          }}
+        >
+          <Tab.Navigator
+            screenOptions={{
+              headerShown: false,
+              tabBarStyle: { display: 'none' },
+              sceneStyle: {
+                backgroundColor: webDash.screenBg,
+                flex: 1,
+                minHeight: 0,
+              },
+            }}
+          >
+            <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Analysis" component={AnalysisScreen} />
+            <Tab.Screen name="Predict" component={PredictScreen} />
+            <Tab.Screen name="History" component={HistoryScreen} />
+            <Tab.Screen name="MyPage" component={MyPageScreen} />
+            <Tab.Screen name="Pricing" component={PricingScreen} />
+            <Tab.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+            <Tab.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+          </Tab.Navigator>
+        </NavigationContainer>
+      </View>
+    </WebLayout>
   );
 }
 
@@ -219,7 +357,7 @@ export function AppNavigator() {
     getInitialWebAuthScreenFromUrl()
   );
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
-  const [webActiveMenu, setWebActiveMenu] = useState<'Home' | 'Analysis' | 'Predict' | 'Drawing'>('Home');
+  const [webActiveMenu, setWebActiveMenu] = useState<WebMenuKey>('Home');
   const webNavRef = useNavigationContainerRef();
   const webAuthScreenRef = useRef(webAuthScreen);
   webAuthScreenRef.current = webAuthScreen;
@@ -404,55 +542,13 @@ export function AppNavigator() {
 
   // ── Web logged-in: wrap app with WebLayout ──
   if (Platform.OS === 'web' && user) {
-    const handleWebMenuPress = (menu: 'Home' | 'Analysis' | 'Predict' | 'Drawing') => {
-      setWebActiveMenu(menu);
-      const targetRoute = menu === 'Drawing' ? 'History' : menu;
-      webNavRef.navigate(targetRoute as never);
-    };
-
-    const handleLogoPress = () => {
-      setWebActiveMenu('Home');
-      webNavRef.navigate('Home' as never);
-    };
-
-    const handleProfilePress = () => {
-      webNavRef.navigate('MyPage' as never);
-    };
-
     return (
-      <WebLayout
-        activeMenu={webActiveMenu}
-        onMenuPress={handleWebMenuPress}
-        onProfilePress={handleProfilePress}
-        onLogoPress={handleLogoPress}
-      >
-        <NavigationContainer
-          ref={webNavRef}
-          onStateChange={() => {
-            const routeName = webNavRef.getCurrentRoute()?.name;
-            if (routeName === 'Home' || routeName === 'Analysis' || routeName === 'Predict') {
-              setWebActiveMenu(routeName);
-            }
-            if (routeName === 'History') {
-              setWebActiveMenu('Drawing');
-            }
-          }}
-        >
-          <Tab.Navigator
-            screenOptions={{
-              headerShown: false,
-              tabBarStyle: { display: 'none' },
-              sceneStyle: { backgroundColor: '#FFFFFF' },
-            }}
-          >
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Analysis" component={AnalysisScreen} />
-            <Tab.Screen name="Predict" component={PredictScreen} />
-            <Tab.Screen name="History" component={HistoryScreen} />
-            <Tab.Screen name="MyPage" component={MyPageScreen} />
-          </Tab.Navigator>
-        </NavigationContainer>
-      </WebLayout>
+      <LoggedInWebShell
+        user={user}
+        webNavRef={webNavRef}
+        webActiveMenu={webActiveMenu}
+        setWebActiveMenu={setWebActiveMenu}
+      />
     );
   }
 

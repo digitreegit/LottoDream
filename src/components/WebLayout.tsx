@@ -13,22 +13,60 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LottoDreamLogo } from './LottoDreamLogo';
 import { UserCircleIcon } from './UserCircleIcon';
+import { webDash } from '../theme/webDashboard';
+import {
+  WebUserMenuDropdown,
+  WebUserMenuPortal,
+  type WebUserMenuAction,
+  type WebUserPlanTier,
+} from './WebUserMenuDropdown';
 
-const APP_MENUS = ['Home', 'Analysis', 'Predict', 'Drawing'] as const;
+export const APP_MENUS = ['Home', 'Analysis', 'Predict', 'Drawing', 'Pricing'] as const;
+export type WebMenuKey = (typeof APP_MENUS)[number];
+
+export type { WebUserMenuAction, WebUserPlanTier };
 
 interface Props {
   children: ReactNode;
-  activeMenu: 'Home' | 'Analysis' | 'Predict' | 'Drawing';
-  onMenuPress: (menu: 'Home' | 'Analysis' | 'Predict' | 'Drawing') => void;
-  onProfilePress: () => void;
+  activeMenu: WebMenuKey;
+  onMenuPress: (menu: WebMenuKey) => void;
   onLogoPress: () => void;
+  /** Logged-in web: profile icon opens account dropdown instead of a single route */
+  accountHeaderMenu?: {
+    userEmail: string;
+    planTier: WebUserPlanTier;
+    onAction: (key: WebUserMenuAction) => void;
+    onSignOut: () => void | Promise<void>;
+  };
 }
 
-export function WebLayout({ children, activeMenu, onMenuPress, onProfilePress, onLogoPress }: Props) {
+export function WebLayout({ children, activeMenu, onMenuPress, onLogoPress, accountHeaderMenu }: Props) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isWide = width >= 768;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
+  const anchorRight = isWide ? 40 : 16;
+
+  const closeAccountMenu = () => setAccountMenuOpen(false);
+
+  const handleProfilePress = () => {
+    if (accountHeaderMenu) {
+      setAccountMenuOpen((v) => !v);
+      return;
+    }
+  };
+
+  const handleMenuItem = (key: WebUserMenuAction) => {
+    closeAccountMenu();
+    accountHeaderMenu?.onAction(key);
+  };
+
+  const handleSignOut = async () => {
+    closeAccountMenu();
+    await Promise.resolve(accountHeaderMenu?.onSignOut());
+  };
 
   if (Platform.OS !== 'web') {
     return <>{children}</>;
@@ -47,30 +85,42 @@ export function WebLayout({ children, activeMenu, onMenuPress, onProfilePress, o
               </View>
               {isWide ? (
                 <View style={styles.navLinks}>
-                  {APP_MENUS.map((menu) => (
-                    <TouchableOpacity key={menu} onPress={() => onMenuPress(menu)} activeOpacity={0.75}>
-                      <Text style={[styles.navLink, activeMenu === menu && styles.navLinkActive]}>{menu}</Text>
+                  {APP_MENUS.map((menu) => {
+                    const active = activeMenu === menu;
+                    return (
+                      <TouchableOpacity
+                        key={menu}
+                        onPress={() => onMenuPress(menu)}
+                        activeOpacity={0.8}
+                        style={styles.navItemHit}
+                      >
+                        <Text style={[styles.navLink, active && styles.navLinkActive]}>{menu}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <View style={styles.profileAnchor}>
+                    <TouchableOpacity
+                      style={styles.profileIconBtn}
+                      onPress={handleProfilePress}
+                      accessibilityLabel="My account"
+                      activeOpacity={0.8}
+                    >
+                      <UserCircleIcon size={26} color="#1F2937" />
                     </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={styles.profileIconBtn}
-                    onPress={onProfilePress}
-                    accessibilityLabel="My account"
-                    activeOpacity={0.8}
-                  >
-                    <UserCircleIcon size={26} color="#1F2937" />
-                  </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.navRightCompact}>
-                  <TouchableOpacity
-                    onPress={onProfilePress}
-                    style={styles.profileIconBtnCompact}
-                    accessibilityLabel="My account"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <UserCircleIcon size={26} color="#1F2937" />
-                  </TouchableOpacity>
+                  <View style={styles.profileAnchor}>
+                    <TouchableOpacity
+                      onPress={handleProfilePress}
+                      style={styles.profileIconBtnCompact}
+                      accessibilityLabel="My account"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <UserCircleIcon size={26} color="#1F2937" />
+                    </TouchableOpacity>
+                  </View>
                   <TouchableOpacity
                     style={styles.hamburger}
                     onPress={() => setMenuOpen((v) => !v)}
@@ -119,8 +169,23 @@ export function WebLayout({ children, activeMenu, onMenuPress, onProfilePress, o
         )}
       </View>
 
+      {accountHeaderMenu && (
+        <WebUserMenuPortal
+          open={accountMenuOpen}
+          onClose={closeAccountMenu}
+          anchorRight={anchorRight}
+        >
+          <WebUserMenuDropdown
+            userEmail={accountHeaderMenu.userEmail}
+            planTier={accountHeaderMenu.planTier}
+            onItem={handleMenuItem}
+            onSignOut={handleSignOut}
+          />
+        </WebUserMenuPortal>
+      )}
+
       <View style={styles.body}>
-        <View style={[styles.contentInner, isWide && styles.contentInnerWide]}>{children}</View>
+        <View style={styles.contentInner}>{children}</View>
       </View>
     </View>
   );
@@ -129,7 +194,9 @@ export function WebLayout({ children, activeMenu, onMenuPress, onProfilePress, o
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    minHeight: 0,
+    width: '100%',
+    backgroundColor: webDash.screenBg,
   },
   navShell: {
     position: 'relative' as const,
@@ -139,6 +206,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     width: '100vw' as any,
     marginLeft: 'calc(50% - 50vw)' as any,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8EDF3',
   },
   navInner: {
     maxWidth: 1280,
@@ -162,15 +231,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
+  navItemHit: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  profileAnchor: {
+    position: 'relative' as const,
+  },
   navLink: {
     color: '#1F2937',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '400',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   navLinkActive: {
-    color: '#00A383',
-    fontWeight: '600',
+    color: webDash.accent,
+    fontWeight: '700',
   },
   profileIconBtn: {
     paddingHorizontal: 10,
@@ -245,21 +321,27 @@ const styles = StyleSheet.create({
   },
   mobileDrawerTextActive: {
     color: '#00A383',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   body: {
     flex: 1,
     width: '100%',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    alignSelf: 'stretch',
+    backgroundColor: webDash.screenBg,
+    // Let nested ScrollView/FlatList shrink and scroll inside flex (web + RN).
+    minHeight: 0,
   },
+  /**
+   * Full viewport width so wheel/trackpad scroll hits the main surface even when
+   * the pointer is in the side “gutter” (previously only the narrow max-width column scrolled).
+   * Content max-width belongs inside each screen, not on this scroll host.
+   */
   contentInner: {
     flex: 1,
     width: '100%',
-    maxWidth: 1280,
-    paddingHorizontal: 16,
-  },
-  contentInnerWide: {
-    paddingHorizontal: 40,
+    minHeight: 0,
+    alignSelf: 'stretch',
+    paddingHorizontal: 0,
+    maxWidth: '100%' as any,
   },
 });

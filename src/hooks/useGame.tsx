@@ -4,7 +4,8 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { GameType, GameConfig } from '../types';
 import { getGameConfig, GAME_CONFIGS } from '../config/constants';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Image, Platform } from 'react-native';
+import { isWebDashboard, webDash } from '../theme/webDashboard';
 
 interface GameContextValue {
   game: GameType;
@@ -44,7 +45,7 @@ export function GameSelector({ light }: { light?: boolean }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, light && isWebDashboard && styles.containerLight]}>
       {games.map((g) => {
         const cfg = getGameConfig(g);
         const active = game === g;
@@ -54,7 +55,20 @@ export function GameSelector({ light }: { light?: boolean }) {
             style={[
               styles.tab,
               light && styles.tabLight,
-              active && { backgroundColor: cfg.accentColor + '33', borderColor: cfg.accentColor },
+              light &&
+                isWebDashboard &&
+                active && {
+                  backgroundColor: `${cfg.accentColor}18`,
+                  borderColor: cfg.accentColor,
+                  ...(Platform.OS === 'web'
+                    ? ({ boxShadow: '0 0 0 2px rgba(15, 23, 42, 0.06)' } as object)
+                    : {}),
+                },
+              light && isWebDashboard && !active && styles.tabLightIdle,
+              light &&
+                active &&
+                !isWebDashboard && { backgroundColor: cfg.accentColor + '33', borderColor: cfg.accentColor },
+              !light && active && { backgroundColor: cfg.accentColor + '33', borderColor: cfg.accentColor },
             ]}
             onPress={() => setGame(g)}
           >
@@ -76,6 +90,15 @@ const styles = StyleSheet.create({
     gap: 8,
     marginVertical: 8,
   },
+  containerLight: {
+    padding: 6,
+    borderRadius: 999,
+    backgroundColor: webDash.cardBg,
+    borderWidth: 1,
+    borderColor: webDash.cardBorder,
+    gap: 6,
+    ...(Platform.OS === 'web' ? ({ boxShadow: webDash.shadowCard } as object) : {}),
+  },
   tab: {
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -85,8 +108,15 @@ const styles = StyleSheet.create({
     borderColor: '#2D3748',
   },
   tabLight: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    borderColor: webDash.cardBorder,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  tabLightIdle: {
+    opacity: 0.92,
   },
   logo: {
     width: 60,

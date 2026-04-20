@@ -3,7 +3,8 @@
 // Shows frequency as color intensity
 // ============================================
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
+import { isWebDashboard, webDash } from '../theme/webDashboard';
 import { NumberFrequency } from '../types';
 
 interface HeatmapProps {
@@ -55,7 +56,7 @@ export function NumberHeatmap({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isWebDashboard && styles.containerWeb]}>
       <Text style={styles.title}>{title}</Text>
       {rows.map((row, ri) => (
         <View key={ri} style={styles.row}>
@@ -108,6 +109,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginVertical: 8,
+  },
+  containerWeb: {
+    borderRadius: webDash.radiusLg,
+    borderWidth: 1,
+    borderColor: webDash.cardBorder,
+    ...(Platform.OS === 'web' ? ({ boxShadow: webDash.shadowCard } as object) : {}),
   },
   title: {
     fontSize: 16,

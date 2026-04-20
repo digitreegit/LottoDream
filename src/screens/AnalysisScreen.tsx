@@ -17,7 +17,7 @@ import { StatRow } from '../components/StatCard';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
-import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+import { isWebDashboard, webDash, nativeDash, webDashboardScrollContent } from '../theme/webDashboard';
 
 const C = isWebDashboard ? webDash : nativeDash;
 
@@ -41,43 +41,55 @@ export function AnalysisScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, isWebDashboard && webDashboardScrollContent]}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#63B3ED" />
       }
     >
-      <Text style={styles.title}>📊 Number Analysis</Text>
+      <View style={styles.pageIntro}>
+        <Text style={styles.eyebrow}>Insights</Text>
+        <Text style={styles.title}>Number analysis</Text>
+        <Text style={styles.lede}>
+          Frequency heatmaps, hot/cold rankings, and pair trends — switch range to zoom in on recent draws.
+        </Text>
+      </View>
 
       {/* Game Selector */}
       <GameSelector light={isWebDashboard} />
 
       {/* Range Selector */}
-      <View style={styles.rangeSelector}>
-        {RANGE_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.key}
-            style={[
-              styles.rangeButton,
-              selectedRange === opt.key && styles.rangeActive,
-            ]}
-            onPress={() => setSelectedRange(opt.key)}
-          >
-            <Text
+      <View style={styles.rangeRail}>
+        <Text style={styles.rangeRailLabel}>Draw window</Text>
+        <View style={styles.rangeSelector}>
+          {RANGE_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
               style={[
-                styles.rangeText,
-                selectedRange === opt.key && styles.rangeTextActive,
+                styles.rangeButton,
+                selectedRange === opt.key && styles.rangeActive,
               ]}
+              onPress={() => setSelectedRange(opt.key)}
             >
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[
+                  styles.rangeText,
+                  selectedRange === opt.key && styles.rangeTextActive,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {currentAnalysis && (
         <>
           {/* Stats Overview */}
-          <Text style={styles.sectionTitle}>{currentAnalysis.range}</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionRule} />
+            <Text style={styles.sectionTitle}>{currentAnalysis.range}</Text>
+          </View>
           <StatRow
             stats={[
               { label: 'Draws', value: currentAnalysis.totalDraws, color: '#3182CE' },
@@ -149,7 +161,7 @@ export function AnalysisScreen() {
 
           {/* Hot Numbers */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>🔥 Hot White Numbers</Text>
+            <Text style={styles.cardTitle}>Hot White Numbers</Text>
             <View style={styles.numberList}>
               {currentAnalysis.hotWhite.map((n, i) => {
                 const freq = currentAnalysis.whiteFrequency.find((f) => f.number === n);
@@ -181,7 +193,7 @@ export function AnalysisScreen() {
 
           {/* Cold Numbers */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>❄️ Cold White Numbers</Text>
+            <Text style={styles.cardTitle}>Cold White Numbers</Text>
             <View style={styles.numberList}>
               {currentAnalysis.coldWhite.map((n, i) => {
                 const freq = currentAnalysis.whiteFrequency.find((f) => f.number === n);
@@ -245,34 +257,87 @@ export function AnalysisScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: C.screenBg,
+    backgroundColor: isWebDashboard ? webDash.screenBg : C.screenBg,
   },
   content: {
     paddingBottom: 40,
     ...Platform.select({
-      web: { paddingHorizontal: 0, paddingTop: 12 },
+      web: { paddingHorizontal: 0, paddingTop: 8 },
       default: { padding: 16 },
     }),
   },
+  pageIntro: {
+    marginBottom: 8,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    color: webDash.accent,
+    textTransform: 'uppercase' as const,
+    marginBottom: 8,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    ...(!isWebDashboard ? { textAlign: 'center' as const, color: '#63B3ED' } : {}),
+  },
   title: {
-    fontSize: 27,
+    fontSize: 26,
     fontWeight: '800',
     color: C.textPrimary,
+    textAlign: isWebDashboard ? ('left' as const) : ('center' as const),
+    marginBottom: 10,
+    letterSpacing: -0.4,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  lede: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    textAlign: isWebDashboard ? ('left' as const) : ('center' as const),
+    marginBottom: 8,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  rangeRail: {
+    marginBottom: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: isWebDashboard ? webDash.radiusLg : 16,
+    ...(isWebDashboard
+      ? {
+          backgroundColor: webDash.cardBg,
+          borderWidth: 1,
+          borderColor: webDash.cardBorder,
+          boxShadow: webDash.shadowCard,
+        }
+      : {
+          backgroundColor: '#111C35',
+          borderWidth: 1,
+          borderColor: '#2D3748',
+        }),
+  },
+  rangeRailLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: isWebDashboard ? webDash.textMuted : '#718096',
+    textTransform: 'uppercase' as const,
+    marginBottom: 10,
     textAlign: 'center',
-    marginVertical: 16,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   rangeSelector: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   rangeButton: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: isWebDashboard ? webDash.cardBg : '#1A2744',
+    borderRadius: 999,
+    backgroundColor: isWebDashboard ? webDash.cardBgMuted : '#1A2744',
     ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
   },
   rangeActive: {
@@ -288,20 +353,34 @@ const styles = StyleSheet.create({
   rangeTextActive: {
     color: '#FFFFFF',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  sectionRule: {
+    width: 3,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: isWebDashboard ? webDash.accent : '#3182CE',
+  },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    fontSize: 15,
+    fontWeight: '700',
+    color: isWebDashboard ? webDash.textPrimary : '#E2E8F0',
     textAlign: 'center',
-    marginBottom: 8,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   card: {
-    backgroundColor: C.cardBg,
-    borderRadius: 16,
+    backgroundColor: isWebDashboard ? webDash.cardBg : C.cardBg,
+    borderRadius: isWebDashboard ? webDash.radiusLg : 16,
     padding: 18,
     marginVertical: 8,
-    ...(isWebDashboard ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+    ...(isWebDashboard
+      ? { borderWidth: 1, borderColor: webDash.cardBorder, boxShadow: webDash.shadowCard }
+      : {}),
   },
   cardTitle: {
     fontSize: 18,
@@ -370,23 +449,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   overdueChip: {
-    backgroundColor: '#744210',
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
     minWidth: 56,
+    ...(isWebDashboard
+      ? {
+          backgroundColor: '#FFFBEB',
+          borderWidth: 1,
+          borderColor: '#FDE68A',
+        }
+      : {
+          backgroundColor: '#744210',
+        }),
   },
   chipNumber: {
-    color: '#FEFCBF',
     fontWeight: '700',
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    ...(isWebDashboard ? { color: webDash.textPrimary } : { color: '#FEFCBF' }),
   },
   chipSub: {
-    color: '#D69E2E',
     fontSize: 10,
     marginTop: 2,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    ...(isWebDashboard ? { color: '#B45309' } : { color: '#D69E2E' }),
   },
   pairRow: {
     flexDirection: 'row',

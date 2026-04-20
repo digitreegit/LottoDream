@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
+import { WEB_CONTENT_MAX_WIDTH } from '../theme/webDashboard';
+import { PREMIUM_PRICE_DISPLAY } from '../config/constants';
 
 interface Props {
   onLogin: () => void;
@@ -345,6 +347,46 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         </View>
       </View>
 
+      {/* ── Pricing teaser ── */}
+      <View style={[styles.pricingBand, isWide && styles.pricingBandWide]}>
+        <Text style={styles.pricingEyebrow}>PRICING</Text>
+        <Text style={[styles.pricingHeading, isWide && styles.pricingHeadingWide]}>
+          Simple, one-time pricing
+        </Text>
+        <Text style={styles.pricingSub}>
+          Pure Random stays free forever. Unlock Hot, Cold, Balanced, Anti-Crowd & Lucky
+          Dates with a single {PREMIUM_PRICE_DISPLAY} purchase — no subscription.
+        </Text>
+
+        <View
+          style={[styles.pricingPlansRow, isWide && styles.pricingPlansRowWide]}
+        >
+          <View style={styles.pricingCard}>
+            <Text style={styles.pricingCardTier}>Free</Text>
+            <Text style={styles.pricingCardPrice}>$0</Text>
+            <Text style={styles.pricingCardLine}>• Pure Random picks</Text>
+            <Text style={styles.pricingCardLine}>• Live jackpots & results</Text>
+            <Text style={styles.pricingCardLine}>• Save up to 20 tickets</Text>
+          </View>
+          <View style={[styles.pricingCard, styles.pricingCardPro]}>
+            <View style={styles.pricingBadge}>
+              <Text style={styles.pricingBadgeText}>BEST VALUE</Text>
+            </View>
+            <Text style={[styles.pricingCardTier, styles.pricingCardTierPro]}>
+              Premium
+            </Text>
+            <Text style={[styles.pricingCardPrice, styles.pricingCardPricePro]}>
+              {PREMIUM_PRICE_DISPLAY}
+              <Text style={styles.pricingCardPriceNote}> · one-time</Text>
+            </Text>
+            <Text style={styles.pricingCardLine}>• All 5 AI prediction modes</Text>
+            <Text style={styles.pricingCardLine}>• Lucky Dates personalization</Text>
+            <Text style={styles.pricingCardLine}>• Unlimited saved tickets & history export</Text>
+            <Text style={styles.pricingCardLine}>• Priority support</Text>
+          </View>
+        </View>
+      </View>
+
       {/* ── CTA Banner ── */}
       <View style={[styles.ctaBanner, isWide && styles.ctaBannerWide]}>
         <Text style={[styles.ctaBannerTitle, isWide && styles.ctaBannerTitleWide]}>
@@ -391,6 +433,13 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       <View style={styles.footerBand}>
         <View style={styles.footerInner}>
           <LottoDreamLogo width={150} />
+          <Text style={styles.footerDisclaimer}>
+            LottoDream is not affiliated with, endorsed by, or sponsored by the
+            Multi-State Lottery Association, Powerball, or Mega Millions. Lottery games
+            involve random outcomes. No system, including AI-based analysis, can
+            guarantee a winning ticket. Play responsibly. Must be 18+ (or the legal
+            gambling age in your jurisdiction) to play.
+          </Text>
           <Text style={styles.footerText}>
             Data sourced from NY Open Data  •  Updated after every drawing
           </Text>
@@ -549,7 +598,7 @@ const styles = StyleSheet.create({
     },
     mobileDrawerText: { fontSize: 15, color: '#1F2937', fontWeight: '500' },
   navLinks: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  navLink: { color: '#1F2937', fontSize: 13, fontWeight: '400', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLink: { color: '#1F2937', fontSize: 14, fontWeight: '400', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   navLoginBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -558,7 +607,7 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     backgroundColor: 'rgba(148, 163, 184, 0.12)',
   },
-  navLoginText: { color: '#111827', fontSize: 13, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  navLoginText: { color: '#111827', fontSize: 14, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Hero */
   hero: {
@@ -670,7 +719,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    maxWidth: 960,
+    maxWidth: WEB_CONTENT_MAX_WIDTH,
     gap: 20,
   },
   featureCard: {
@@ -691,7 +740,7 @@ const styles = StyleSheet.create({
   featureDesc: { fontSize: 13, color: '#475569', lineHeight: 20, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
   /* Steps — timeline (wide) / stacked (narrow) */
-  stepsRow: { gap: 28, width: '100%', maxWidth: 960, alignSelf: 'center' as any },
+  stepsRow: { gap: 28, width: '100%', maxWidth: WEB_CONTENT_MAX_WIDTH, alignSelf: 'center' as any },
   stepsRowWide: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
@@ -829,6 +878,118 @@ const styles = StyleSheet.create({
   },
   gameDesc: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
 
+  /* Pricing */
+  pricingBand: {
+    marginTop: 32,
+    marginHorizontal: 20,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  pricingBandWide: {
+    marginHorizontal: 40,
+    paddingVertical: 64,
+  },
+  pricingEyebrow: {
+    color: '#00A383',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 10,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  pricingHeading: {
+    fontSize: 26,
+    fontWeight: '600',
+    color: '#0F172A',
+    textAlign: 'center' as const,
+    marginBottom: 10,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  pricingHeadingWide: { fontSize: 31 },
+  pricingSub: {
+    fontSize: 14,
+    color: '#475569',
+    textAlign: 'center' as const,
+    maxWidth: 560,
+    lineHeight: 22,
+    marginBottom: 28,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  pricingPlansRow: {
+    flexDirection: 'column' as const,
+    gap: 16,
+    width: '100%' as any,
+    maxWidth: 820,
+  },
+  pricingPlansRowWide: {
+    flexDirection: 'row' as const,
+    gap: 20,
+  },
+  pricingCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    gap: 6,
+    ...(Platform.OS === 'web'
+      ? ({ boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 12px 24px -12px rgba(15,23,42,0.08)' } as object)
+      : {}),
+  },
+  pricingCardPro: {
+    borderColor: '#00A383',
+    borderWidth: 2,
+    position: 'relative' as const,
+  },
+  pricingBadge: {
+    position: 'absolute' as const,
+    top: -12,
+    right: 20,
+    backgroundColor: '#00A383',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  pricingBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  pricingCardTier: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  pricingCardTierPro: { color: '#00A383' },
+  pricingCardPrice: {
+    color: '#0F172A',
+    fontSize: 34,
+    fontWeight: '700',
+    marginBottom: 12,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  pricingCardPricePro: {},
+  pricingCardPriceNote: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  pricingCardLine: {
+    color: '#334155',
+    fontSize: 14,
+    lineHeight: 22,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+
   /* CTA Banner */
   ctaBanner: {
     marginVertical: 40,
@@ -919,4 +1080,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   footerText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  footerDisclaimer: {
+    color: '#475569',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center' as const,
+    marginTop: 20,
+    marginBottom: 12,
+    maxWidth: 720,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
 });

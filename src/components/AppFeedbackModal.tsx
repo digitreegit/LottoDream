@@ -16,7 +16,7 @@ import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
 
 const C = isWebDashboard ? webDash : nativeDash;
 
-export type AppFeedbackVariant = 'default' | 'error' | 'success' | 'warning';
+export type AppFeedbackVariant = 'default' | 'error' | 'success' | 'warning' | 'info';
 
 export type AppFeedbackModalProps = {
   visible: boolean;
@@ -40,6 +40,8 @@ function variantAccent(variant: AppFeedbackVariant): string {
       return isWebDashboard ? webDash.accent : '#4ADE80';
     case 'warning':
       return '#D97706';
+    case 'info':
+      return isWebDashboard ? webDash.accent : '#2563EB';
     default:
       return isWebDashboard ? webDash.accent : '#63B3ED';
   }

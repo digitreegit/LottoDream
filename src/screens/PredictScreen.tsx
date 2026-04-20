@@ -18,14 +18,16 @@ import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
-import { isWebDashboard, webDash, nativeDash } from '../theme/webDashboard';
+import { useEntitlement } from '../hooks/useEntitlement';
+import { isWebDashboard, webDash, nativeDash, webDashboardScrollContent } from '../theme/webDashboard';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
+import { PREMIUM_PRICE_DISPLAY } from '../config/constants';
 
 const W = isWebDashboard;
 const C = W ? webDash : nativeDash;
 import { generatePrediction, generateAllPredictions, generateLuckyDatesPrediction, extractNumbersFromDate } from '../services/predictionEngine';
 import { savePredictionSet } from '../services/ticketService';
-import { PredictionSet, PredictionMode, LuckyDate } from '../types';
+import { PredictionSet, PredictionMode, LuckyDate, isPremiumMode } from '../types';
 
 type PredictNotice = {
   variant: AuthNoticeVariant;
@@ -67,10 +69,21 @@ const MODE_INFO: Record<PredictionMode, { icon: string; label: string; desc: str
   },
 };
 
-export function PredictScreen() {
+const SMART_PICK_MODE_ORDER = Object.keys(MODE_INFO) as PredictionMode[];
+
+export function PredictScreen({ navigation }: any) {
   const { game, config } = useGame();
   const { user } = useAuth();
+  const { isPremium } = useEntitlement();
   const { draws, loading: dataLoading } = useDraws(game);
+
+  const goToPricing = useCallback(() => {
+    try {
+      navigation?.navigate?.('Pricing');
+    } catch {
+      // ignore navigation race; Pricing is available as a tab route
+    }
+  }, [navigation]);
   const [predictions, setPredictions] = useState<PredictionSet[]>([]);
   const [generating, setGenerating] = useState(false);
   const [selectedMode, setSelectedMode] = useState<PredictionMode | null>(null);
@@ -93,7 +106,19 @@ export function PredictScreen() {
     });
   }, []);
 
+  const presentPremiumNotice = useCallback(() => {
+    presentNotice({
+      variant: 'info',
+      title: 'Premium feature',
+      message: `Unlock all 5 AI prediction modes for ${PREMIUM_PRICE_DISPLAY} (one-time). Tap “See Pricing” below.`,
+    });
+  }, [presentNotice]);
+
   const runLuckyGeneration = useCallback(() => {
+    if (!isPremium) {
+      presentPremiumNotice();
+      return;
+    }
     if (luckyDates.length === 0) {
       presentNotice({
         variant: 'warning',
@@ -131,9 +156,13 @@ export function PredictScreen() {
         setGenerating(false);
       }
     }, 100);
-  }, [luckyDates, draws, game, presentNotice]);
+  }, [luckyDates, draws, game, presentNotice, isPremium, presentPremiumNotice]);
 
   const handleGenerateAll = useCallback(() => {
+    if (!isPremium) {
+      presentPremiumNotice();
+      return;
+    }
     if (draws.length === 0) {
       presentNotice({
         variant: 'warning',
@@ -158,10 +187,14 @@ export function PredictScreen() {
         setGenerating(false);
       }
     }, 100);
-  }, [draws, game, presentNotice]);
+  }, [draws, game, presentNotice, isPremium, presentPremiumNotice]);
 
   const handleGenerateSingle = useCallback(
     (mode: PredictionMode, isRegenerate = false) => {
+      if (isPremiumMode(mode) && !isPremium) {
+        presentPremiumNotice();
+        return;
+      }
       if (mode === 'lucky') {
         runLuckyGeneration();
         return;
@@ -195,7 +228,7 @@ export function PredictScreen() {
         }
       }, 100);
     },
-    [draws, game, runLuckyGeneration, presentNotice]
+    [draws, game, runLuckyGeneration, presentNotice, isPremium, presentPremiumNotice]
   );
 
   const handleSave = useCallback(
@@ -281,51 +314,113 @@ export function PredictScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, W && webDashboardScrollContent]}
         keyboardShouldPersistTaps="always"
         keyboardDismissMode="on-drag"
       >
-      <Text style={styles.title}>🎯 Smart Picks</Text>
-      <Text style={styles.subtitle}>
-        AI-powered number recommendations based on{'\n'}
-        {draws.length.toLocaleString()} historical {config.name} draws
-      </Text>
+      <View style={styles.pageIntro}>
+        <Text style={styles.eyebrow}>Generator</Text>
+        <Text style={styles.title}>Smart picks</Text>
+        <Text style={styles.subtitle}>
+          Six strategies plus lucky dates — tuned to {draws.length.toLocaleString()} historical {config.name}{' '}
+          draws. Tap a card to generate; use “all modes” for a full set.
+        </Text>
+      </View>
 
       {/* Game Selector */}
       <GameSelector light={isWebDashboard} />
 
-      {/* Mode Selector */}
+      {/* Premium upgrade banner — hidden for premium users */}
+      {!isPremium && (
+        <TouchableOpacity
+          style={styles.premiumBanner}
+          activeOpacity={0.88}
+          onPress={goToPricing}
+          accessibilityRole="button"
+          accessibilityLabel="Unlock premium prediction modes"
+        >
+          <View style={styles.premiumBannerLeft}>
+            <Text style={styles.premiumBannerEyebrow}>Free plan</Text>
+            <Text style={styles.premiumBannerTitle}>
+              Pure Random is unlocked. Unlock 5 AI modes for {PREMIUM_PRICE_DISPLAY}.
+            </Text>
+            <Text style={styles.premiumBannerSub}>
+              Hot, Cold, Balanced, Anti-Crowd & Lucky Dates — one-time purchase, every device.
+            </Text>
+          </View>
+          <View style={styles.premiumBannerCta}>
+            <Text style={styles.premiumBannerCtaText}>See Pricing →</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Mode Selector — 3 columns × 2 rows */}
       <View style={styles.modeGrid}>
-        {(Object.keys(MODE_INFO) as PredictionMode[]).map((mode) => {
-          const info = MODE_INFO[mode];
-          const isActive = selectedMode === mode;
-          return (
-            <TouchableOpacity
-              key={mode}
-              style={[styles.modeCard, isActive && styles.modeCardActive]}
-              onPress={() => handleGenerateSingle(mode)}
-              disabled={generating || dataLoading}
-            >
-              <Text style={styles.modeIcon}>{info.icon}</Text>
-              <Text style={[styles.modeLabel, isActive && styles.modeLabelActive]}>
-                {info.label}
-              </Text>
-              <Text style={styles.modeDesc}>{info.desc}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {[0, 1].map((row) => (
+          <View key={row} style={styles.modeRow}>
+            {SMART_PICK_MODE_ORDER.slice(row * 3, row * 3 + 3).map((mode) => {
+              const info = MODE_INFO[mode];
+              const isActive = selectedMode === mode;
+              const modeIsPremium = isPremiumMode(mode);
+              const locked = modeIsPremium && !isPremium;
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  style={[
+                    styles.modeCard,
+                    isActive && !locked && styles.modeCardActive,
+                    locked && styles.modeCardLocked,
+                  ]}
+                  onPress={() => (locked ? goToPricing() : handleGenerateSingle(mode))}
+                  disabled={generating || dataLoading}
+                >
+                  {modeIsPremium && (
+                    <View style={locked ? styles.modeLockBadge : styles.modePremiumBadge}>
+                      <Text
+                        style={
+                          locked ? styles.modeLockBadgeText : styles.modePremiumBadgeText
+                        }
+                      >
+                        {locked ? `🔒 ${PREMIUM_PRICE_DISPLAY}` : 'PRO'}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.modeIcon, locked && styles.modeIconLocked]}>
+                    {info.icon}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.modeLabel,
+                      isActive && !locked && styles.modeLabelActive,
+                      locked && styles.modeLabelLocked,
+                    ]}
+                  >
+                    {info.label}
+                  </Text>
+                  <Text style={[styles.modeDesc, locked && styles.modeDescLocked]}>
+                    {info.desc}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
       </View>
 
       {/* Generate All Button */}
       <TouchableOpacity
-        style={styles.generateButton}
-        onPress={handleGenerateAll}
+        style={[styles.generateButton, !isPremium && styles.generateButtonLocked]}
+        onPress={isPremium ? handleGenerateAll : goToPricing}
         disabled={generating || dataLoading}
       >
         {generating ? (
           <ActivityIndicator color="#FFF" />
         ) : (
-          <Text style={styles.generateText}>⚡ Generate All 5 Modes</Text>
+          <Text style={styles.generateText}>
+            {isPremium
+              ? '⚡ Generate All 6 Modes'
+              : `🔒 Unlock All Modes — ${PREMIUM_PRICE_DISPLAY}`}
+          </Text>
         )}
       </TouchableOpacity>
 
@@ -561,7 +656,7 @@ export function PredictScreen() {
 const styles = StyleSheet.create({
   pageRoot: {
     flex: 1,
-    backgroundColor: C.screenBg,
+    backgroundColor: W ? webDash.screenBg : C.screenBg,
   },
   noticeStrip: {
     ...Platform.select({
@@ -578,45 +673,184 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 40,
     ...Platform.select({
-      web: { paddingHorizontal: 0, paddingTop: 12 },
+      web: { paddingHorizontal: 0, paddingTop: 8 },
       default: { padding: 16 },
     }),
+  },
+  pageIntro: {
+    marginBottom: 12,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    color: W ? webDash.accent : '#63B3ED',
+    textTransform: 'uppercase' as const,
+    marginBottom: 8,
+    textAlign: W ? ('left' as const) : ('center' as const),
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
     color: C.textPrimary,
-    textAlign: 'center',
-    marginTop: 16,
+    textAlign: W ? ('left' as const) : ('center' as const),
+    marginBottom: 10,
+    letterSpacing: -0.4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: W ? webDash.textSecondary : '#A0AEC0',
-    textAlign: 'center',
-    marginBottom: 20,
+    textAlign: W ? ('left' as const) : ('center' as const),
+    marginBottom: 16,
+    lineHeight: 22,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 14,
+    marginBottom: 18,
+    padding: 18,
+    borderRadius: W ? webDash.radiusLg : 16,
+    borderWidth: 1,
+    borderColor: W ? 'rgba(234, 179, 8, 0.45)' : '#7B61FF',
+    backgroundColor: W ? 'rgba(254, 252, 232, 0.9)' : '#2D1B69',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : null),
+    ...(W
+      ? ({
+          boxShadow:
+            '0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 24px -12px rgba(180, 83, 9, 0.18)',
+        } as object)
+      : {}),
+  },
+  premiumBannerLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  premiumBannerEyebrow: {
+    color: W ? '#B45309' : '#FDE68A',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase' as const,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  premiumBannerTitle: {
+    color: W ? '#92400E' : '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  premiumBannerSub: {
+    color: W ? '#78350F' : '#CBD5E1',
+    fontSize: 12,
     lineHeight: 18,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  premiumBannerCta: {
+    backgroundColor: W ? '#B45309' : '#7B61FF',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  premiumBannerCtaText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   modeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: 8,
     marginBottom: 16,
   },
+  modeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   modeCard: {
-    width: '47%',
+    flex: 1,
+    minWidth: 0,
     backgroundColor: W ? webDash.cardBg : '#1A2744',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: W ? webDash.radiusMd : 14,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: W ? webDash.cardBorder : '#2D3748',
+    ...(W
+      ? ({
+          boxShadow: webDash.shadowCard,
+          minHeight: 118,
+          cursor: 'pointer' as const,
+        } as object)
+      : {}),
   },
   modeCardActive: {
     borderColor: W ? webDash.accent : '#3182CE',
-    backgroundColor: W ? 'rgba(0, 163, 131, 0.12)' : '#1E3A5F',
+    backgroundColor: W ? webDash.accentSoft : '#1E3A5F',
+    ...(W
+      ? ({
+          boxShadow: '0 0 0 2px rgba(0, 163, 131, 0.25), 0 10px 24px -10px rgba(15, 23, 42, 0.12)',
+        } as object)
+      : {}),
+  },
+  modeCardLocked: {
+    backgroundColor: W ? '#FAFAFA' : '#0F1930',
+    borderStyle: 'dashed' as const,
+    borderColor: W ? '#D4D4D8' : '#3F3F7F',
+  },
+  modeLockBadge: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    backgroundColor: W ? '#FEF3C7' : '#7B61FF',
+    borderRadius: 999,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: W ? '#FCD34D' : '#553C9A',
+  },
+  modeLockBadgeText: {
+    color: W ? '#92400E' : '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modePremiumBadge: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    backgroundColor: W ? webDash.accent : '#63B3ED',
+    borderRadius: 999,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  modePremiumBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  modeIconLocked: {
+    opacity: 0.55,
+  },
+  modeLabelLocked: {
+    color: W ? webDash.textMuted : '#A0AEC0',
+  },
+  modeDescLocked: {
+    color: W ? webDash.textSoft : '#718096',
+  },
+  generateButtonLocked: {
+    backgroundColor: W ? '#B45309' : '#7B61FF',
   },
   modeIcon: {
     fontSize: 28,
@@ -665,10 +899,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   resultCard: {
-    backgroundColor: C.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    ...(W ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+    backgroundColor: W ? webDash.cardBg : C.cardBg,
+    borderRadius: W ? webDash.radiusLg : 16,
+    padding: 18,
+    ...(W
+      ? { borderWidth: 1, borderColor: webDash.cardBorder, boxShadow: webDash.shadowCard }
+      : {}),
   },
   resultHeader: {
     flexDirection: 'row',
@@ -734,20 +970,21 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     marginTop: 16,
-    backgroundColor: C.cardBg,
-    borderRadius: 14,
+    backgroundColor: W ? webDash.cardBg : C.cardBg,
+    borderRadius: W ? webDash.radiusMd : 14,
     padding: 16,
-    ...(W ? { borderWidth: 1, borderColor: webDash.cardBorder } : {}),
+    ...(W ? { borderWidth: 1, borderColor: webDash.cardBorder, boxShadow: webDash.shadowCard } : {}),
   },
 
   /* Score Explanation Box */
   scoreExplainBox: {
     marginTop: 12,
     backgroundColor: W ? webDash.cardBg : '#0F1E38',
-    borderRadius: 14,
+    borderRadius: W ? webDash.radiusLg : 14,
     borderWidth: 1,
     borderColor: W ? webDash.cardBorder : '#2D3748',
     padding: 16,
+    ...(W ? ({ boxShadow: webDash.shadowCard } as object) : {}),
   },
   scoreExplainTitle: {
     color: C.textPrimary,
@@ -835,11 +1072,12 @@ const styles = StyleSheet.create({
   /* Lucky Dates Panel */
   luckyPanel: {
     backgroundColor: W ? webDash.cardBg : '#111C35',
-    borderRadius: 16,
+    borderRadius: W ? webDash.radiusLg : 16,
     borderWidth: 1,
     borderColor: W ? webDash.cardBorder : '#7B61FF44',
     marginBottom: 20,
     overflow: 'hidden',
+    ...(W ? ({ boxShadow: webDash.shadowCard } as object) : {}),
   },
   luckyPanelHeader: {
     flexDirection: 'row',
