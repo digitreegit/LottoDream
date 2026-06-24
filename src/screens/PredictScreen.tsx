@@ -1,7 +1,7 @@
 // ============================================
 // Predict Screen - Number Generation
 // ============================================
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,18 +15,20 @@ import {
 import { AuthNoticeBanner, type AuthNoticeVariant } from '../components/AuthNoticeBanner';
 import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { LottoRow } from '../components/LottoBall';
+import { NumberPad } from '../components/NumberPad';
+import { OddsVisualizer } from '../components/OddsVisualizer';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
 import { isWebDashboard, webDash, nativeDash, webDashboardScrollContent } from '../theme/webDashboard';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
-import { PREMIUM_PRICE_DISPLAY } from '../config/constants';
+import { PREMIUM_PRICE_DISPLAY, PREMIUM_PRICE_PERIOD, PREMIUM_TRIAL_DAYS } from '../config/constants';
 
 const W = isWebDashboard;
 const C = W ? webDash : nativeDash;
 import { generatePrediction, generateAllPredictions, generateLuckyDatesPrediction, extractNumbersFromDate } from '../services/predictionEngine';
-import { savePredictionSet } from '../services/ticketService';
+import { savePredictionSet, addNumberCollectionItem } from '../services/ticketService';
 import { PredictionSet, PredictionMode, LuckyDate, isPremiumMode } from '../types';
 
 type PredictNotice = {
@@ -97,6 +99,29 @@ export function PredictScreen({ navigation }: any) {
   const [notice, setNotice] = useState<PredictNotice | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
+  // Manual "pick your own" pad state
+  const [showManual, setShowManual] = useState(false);
+  const [manualMains, setManualMains] = useState<number[]>([]);
+  const [manualBonus, setManualBonus] = useState<number | null>(null);
+  const [savingManual, setSavingManual] = useState(false);
+
+  // Reset manual selection whenever the game changes (counts/ranges differ).
+  useEffect(() => {
+    setManualMains([]);
+    setManualBonus(null);
+  }, [game]);
+
+  const toggleManualMain = useCallback(
+    (n: number) => {
+      setManualMains((prev) => {
+        if (prev.includes(n)) return prev.filter((x) => x !== n);
+        if (prev.length >= config.mainCount) return prev;
+        return [...prev, n];
+      });
+    },
+    [config.mainCount]
+  );
+
   const dismissNotice = useCallback(() => setNotice(null), []);
   const presentNotice = useCallback((p: PredictNotice) => setNotice(p), []);
 
@@ -110,7 +135,7 @@ export function PredictScreen({ navigation }: any) {
     presentNotice({
       variant: 'info',
       title: 'Premium feature',
-      message: `Unlock all 5 AI prediction modes for ${PREMIUM_PRICE_DISPLAY} (one-time). Tap “See Pricing” below.`,
+      message: `Start your ${PREMIUM_TRIAL_DAYS}-day free trial to unlock all AI modes — then ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD}. Tap “See Pricing” below.`,
     });
   }, [presentNotice]);
 
@@ -266,6 +291,66 @@ export function PredictScreen({ navigation }: any) {
     [user, presentNotice, scrollPredictToTop]
   );
 
+  const fillManualRandom = useCallback(() => {
+    const mains = new Set<number>();
+    while (mains.size < config.mainCount) {
+      mains.add(Math.floor(Math.random() * config.mainMax) + 1);
+    }
+    setManualMains([...mains].sort((a, b) => a - b));
+    setManualBonus(
+      config.hasBonus ? Math.floor(Math.random() * config.bonusMax) + 1 : null
+    );
+  }, [config]);
+
+  const handleSaveManual = useCallback(async () => {
+    if (!user) {
+      presentNotice({
+        variant: 'warning',
+        title: '로그인 필요',
+        message: '번호를 저장하려면 로그인해주세요.',
+      });
+      scrollPredictToTop();
+      return;
+    }
+    if (manualMains.length !== config.mainCount) {
+      presentNotice({
+        variant: 'warning',
+        title: '번호 부족',
+        message: `${config.mainCount}개의 번호를 모두 선택해주세요.`,
+      });
+      return;
+    }
+    if (config.hasBonus && !manualBonus) {
+      presentNotice({
+        variant: 'warning',
+        title: `${config.bonusLabel || 'Bonus'} 필요`,
+        message: `${config.bonusLabel || 'Bonus'} 번호를 선택해주세요.`,
+      });
+      return;
+    }
+    setSavingManual(true);
+    const { error } = await addNumberCollectionItem({
+      game,
+      source: 'manual',
+      whites: manualMains,
+      powerball: config.hasBonus ? (manualBonus as number) : 0,
+    });
+    setSavingManual(false);
+    if (error) {
+      presentNotice({ variant: 'error', title: '저장 실패', message: error });
+      scrollPredictToTop();
+      return;
+    }
+    presentNotice({
+      variant: 'success',
+      title: '저장 완료',
+      message: '내 번호에 저장되었습니다.',
+    });
+    setManualMains([]);
+    setManualBonus(null);
+    scrollPredictToTop();
+  }, [user, manualMains, manualBonus, config, game, presentNotice, scrollPredictToTop]);
+
   const handleAddLuckyDate = useCallback(() => {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!newLabel.trim()) {
@@ -330,6 +415,78 @@ export function PredictScreen({ navigation }: any) {
       {/* Game Selector */}
       <GameSelector light={isWebDashboard} />
 
+      {/* ── Pick your own (manual) ── */}
+      <View style={styles.luckyPanel}>
+        <TouchableOpacity
+          style={styles.luckyPanelHeader}
+          onPress={() => setShowManual((s) => !s)}
+        >
+          <View>
+            <Text style={styles.luckyPanelTitle}>🎯 Pick your own</Text>
+            <Text style={styles.luckyPanelSubtitle}>
+              번호판을 눌러 직접 고르고 내 번호로 저장하세요
+            </Text>
+          </View>
+          <Text style={styles.luckyPanelChevron}>{showManual ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {showManual && (
+          <View style={styles.manualBody}>
+            {manualMains.length > 0 && (
+              <View style={styles.manualPreview}>
+                <LottoRow
+                  whites={[...manualMains].sort((a, b) => a - b)}
+                  powerball={manualBonus ?? 0}
+                  game={game}
+                  size={36}
+                  showBonus={config.hasBonus}
+                />
+              </View>
+            )}
+
+            <NumberPad
+              config={config}
+              selectedMains={manualMains}
+              selectedBonus={manualBonus}
+              onToggleMain={toggleManualMain}
+              onSelectBonus={setManualBonus}
+            />
+
+            <View style={styles.manualActions}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.manualActionBtn]}
+                onPress={fillManualRandom}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.actionText}>🎲 Quick Fill</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.manualActionBtn]}
+                onPress={() => {
+                  setManualMains([]);
+                  setManualBonus(null);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.actionText}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.luckyGenerateBtn, styles.manualSaveBtn]}
+                onPress={() => void handleSaveManual()}
+                disabled={savingManual}
+                activeOpacity={0.85}
+              >
+                {savingManual ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.luckyGenerateBtnText}>💾 Save to My Numbers</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
+
       {/* Premium upgrade banner — hidden for premium users */}
       {!isPremium && (
         <TouchableOpacity
@@ -342,10 +499,10 @@ export function PredictScreen({ navigation }: any) {
           <View style={styles.premiumBannerLeft}>
             <Text style={styles.premiumBannerEyebrow}>Free plan</Text>
             <Text style={styles.premiumBannerTitle}>
-              Pure Random is unlocked. Unlock 5 AI modes for {PREMIUM_PRICE_DISPLAY}.
+              Pure Random is free. Try all AI modes free for {PREMIUM_TRIAL_DAYS} days.
             </Text>
             <Text style={styles.premiumBannerSub}>
-              Hot, Cold, Balanced, Anti-Crowd & Lucky Dates — one-time purchase, every device.
+              Hot, Cold, Balanced, Anti-Crowd & Lucky Dates — then {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}. Cancel anytime.
             </Text>
           </View>
           <View style={styles.premiumBannerCta}>
@@ -419,7 +576,7 @@ export function PredictScreen({ navigation }: any) {
           <Text style={styles.generateText}>
             {isPremium
               ? '⚡ Generate All 6 Modes'
-              : `🔒 Unlock All Modes — ${PREMIUM_PRICE_DISPLAY}`}
+              : `🔒 Start ${PREMIUM_TRIAL_DAYS}-day free trial`}
           </Text>
         )}
       </TouchableOpacity>
@@ -569,15 +726,10 @@ export function PredictScreen({ navigation }: any) {
                 </View>
 
                 <Text style={styles.resultExplain}>{pred.explanation}</Text>
-                {pred.backtest && pred.backtest.sampleSize > 0 && (
-                  <Text style={styles.backtestText}>
-                    Backtest {pred.backtest.sampleSize}회: 평균 화이트 매치 {pred.backtest.avgWhiteMatches.toFixed(2)} /
-                    보너스 적중률 {(pred.backtest.powerballHitRate * 100).toFixed(1)}% /
-                    3등급+ 유사 매치율 {(pred.backtest.tier3PlusRate * 100).toFixed(1)}%
-                  </Text>
-                )}
 
-                <View style={styles.resultActions}>
+                <OddsVisualizer prediction={pred} draws={draws} />
+
+                <View style={[styles.resultActions, { marginTop: 14 }]}>
                   <TouchableOpacity
                     style={styles.actionButton}
                     activeOpacity={0.85}
@@ -1067,6 +1219,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+
+  /* Manual picker */
+  manualBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  manualPreview: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  manualActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 16,
+  },
+  manualActionBtn: {
+    flex: 0,
+    paddingHorizontal: 16,
+  },
+  manualSaveBtn: {
+    flex: 1,
+    marginHorizontal: 0,
+    marginBottom: 0,
+    minWidth: 180,
   },
 
   /* Lucky Dates Panel */

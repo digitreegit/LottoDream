@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "web:export": "expo export --platform web",
+    "vercel-build": "expo export --platform web",
     "web:patch-base": "node scripts/patch-web-base-path.js",
     "web:export:subdir": "npm run web:export && npm run web:patch-base -- /lotto"
   },

@@ -12,13 +12,14 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Linking,
   Modal,
   TextInput,
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
 import { getProfile, signOut } from '../services/authService';
-import { PREMIUM_PRICE_DISPLAY } from '../config/constants';
+import { PREMIUM_PRICE_DISPLAY, SUPPORT_EMAIL } from '../config/constants';
 import {
   getSavedNumberSets,
   getNumberCollectionItems,
@@ -95,17 +96,9 @@ export function MyPageScreen({ navigation }: any) {
       setSavedNumbersOpen(false);
       setNumberCollectionOpen(false);
     } else if (focus === 'faq') {
-      setAlertFeedback({
-        variant: 'info',
-        title: 'FAQ',
-        message: 'Help topics are coming soon. Check back shortly.',
-      });
+      navigation.navigate('FAQ');
     } else if (focus === 'support') {
-      setAlertFeedback({
-        variant: 'info',
-        title: 'Customer support',
-        message: 'For assistance, please use the contact options in your app store listing or official site.',
-      });
+      void Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
     } else if (focus === 'password') {
       setAlertFeedback({
         variant: 'info',
@@ -458,24 +451,12 @@ export function MyPageScreen({ navigation }: any) {
         <MenuItem
           icon="❓"
           label="FAQ"
-          onPress={() =>
-            setAlertFeedback({
-              variant: 'info',
-              title: 'FAQ',
-              message: 'Help topics are coming soon. Check back shortly.',
-            })
-          }
+          onPress={() => navigation.navigate('FAQ')}
         />
         <MenuItem
           icon="💬"
           label="Customer Support"
-          onPress={() =>
-            setAlertFeedback({
-              variant: 'info',
-              title: 'Customer support',
-              message: 'For assistance, please use the contact options in your app store listing or official site.',
-            })
-          }
+          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
         />
         <MenuItem icon="📄" label="Terms of Service" onPress={() => navigation.navigate('TermsOfService')} />
         <MenuItem icon="🔒" label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />

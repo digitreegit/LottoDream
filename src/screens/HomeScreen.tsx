@@ -23,14 +23,14 @@ import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/l
 import { getGameConfig } from '../config/constants';
 import { webDash, webDashboardScrollContent } from '../theme/webDashboard';
 import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
-import type { Draw, GameType } from '../types';
+import { drawNumbers, drawBonus, drawMultiplier, type Draw, type GameType } from '../types';
 
 const isWeb = Platform.OS === 'web';
 
-const LOGO = {
+const LOGO: Partial<Record<GameType, any>> = {
   powerball: require('../../assets/powerball-logo.png'),
   megamillions: require('../../assets/mega-millions-logo.png'),
-} as const;
+};
 
 function formatLongDrawDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -150,7 +150,11 @@ function LotteryHeroCard({
         style={styles.heroCardBodyTouchable}
       >
         <View style={styles.heroCardTop}>
-          <Image source={LOGO[gameType]} style={styles.heroLogo} resizeMode="contain" />
+          {LOGO[gameType] ? (
+            <Image source={LOGO[gameType]} style={styles.heroLogo} resizeMode="contain" />
+          ) : (
+            <Text style={styles.heroFallbackName}>{cfg.name}</Text>
+          )}
         </View>
 
         <View style={[styles.heroJackpotBand, { backgroundColor: bandColor }]}>
@@ -179,13 +183,13 @@ function LotteryHeroCard({
           ) : latestDraw ? (
             <>
               <HeroNumberRow
-                whites={[latestDraw.n1, latestDraw.n2, latestDraw.n3, latestDraw.n4, latestDraw.n5]}
-                bonus={latestDraw.powerball}
+                whites={drawNumbers(latestDraw)}
+                bonus={drawBonus(latestDraw) ?? 0}
                 bonusHex={bonusHex}
               />
-              {latestDraw.powerplay != null && latestDraw.powerplay > 0 ? (
+              {drawMultiplier(latestDraw) != null && (drawMultiplier(latestDraw) as number) > 0 ? (
                 <Text style={styles.heroMultiplier}>
-                  {cfg.multiplierLabel?.toUpperCase() ?? 'MULTIPLIER'} ×{latestDraw.powerplay}
+                  {cfg.multiplierLabel?.toUpperCase() || 'MULTIPLIER'} ×{drawMultiplier(latestDraw)}
                 </Text>
               ) : null}
             </>
@@ -381,8 +385,8 @@ export function HomeScreen({ navigation }: any) {
               })}
             </Text>
             <LottoRow
-              whites={[draw.n1, draw.n2, draw.n3, draw.n4, draw.n5]}
-              powerball={draw.powerball}
+              whites={drawNumbers(draw)}
+              powerball={drawBonus(draw) ?? 0}
               game={game}
               size={32}
             />
@@ -478,6 +482,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 44,
     maxWidth: 220,
+  },
+  heroFallbackName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   heroJackpotBand: {
     paddingHorizontal: 14,

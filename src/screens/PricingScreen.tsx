@@ -15,10 +15,13 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
-import { startPremiumCheckout } from '../services/paymentService';
+import { startPremiumCheckout, openBillingPortal } from '../services/paymentService';
 import {
   PREMIUM_PRICE_DISPLAY,
+  PREMIUM_PRICE_PERIOD,
+  PREMIUM_TRIAL_DAYS,
   PREMIUM_CURRENCY,
+  SUPPORT_EMAIL,
 } from '../config/constants';
 import {
   FONT_FAMILY,
@@ -123,9 +126,9 @@ interface Props {
 export function PricingScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const { isPremium, refresh } = useEntitlement();
+  const { isPremium, isTrialing, cancelAtPeriodEnd, currentPeriodEnd, refresh } = useEntitlement();
   const [checkoutStatus, setCheckoutStatus] = useState<
-    null | 'loading' | 'redirected' | 'mobile-notice' | 'error'
+    null | 'loading' | 'redirected' | 'portal' | 'error'
   >(null);
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
@@ -138,24 +141,31 @@ export function PricingScreen({ navigation }: Props) {
     }
     setCheckoutStatus('loading');
     setCheckoutMsg(null);
-    const outcome = await startPremiumCheckout({
-      userId: user.id,
-      email: user.email ?? undefined,
-    });
+    const outcome = await startPremiumCheckout();
     if (outcome.status === 'redirected') {
       setCheckoutStatus('redirected');
-      setCheckoutMsg(
-        'Checkout opened in a new tab. When your payment is complete, your account will unlock automatically.',
-      );
+      setCheckoutMsg('Redirecting you to secure Stripe checkout…');
       void refresh();
-    } else if (outcome.status === 'unsupported') {
-      setCheckoutStatus('mobile-notice');
-      setCheckoutMsg(outcome.reason);
     } else {
       setCheckoutStatus('error');
       setCheckoutMsg(outcome.reason);
     }
   };
+
+  const handleManage = async () => {
+    setCheckoutStatus('portal');
+    setCheckoutMsg(null);
+    const outcome = await openBillingPortal();
+    if (outcome.status !== 'redirected') {
+      setCheckoutStatus('error');
+      setCheckoutMsg(outcome.reason);
+    }
+  };
+
+  const formatDate = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : null;
 
   return (
     <ScrollView
@@ -168,11 +178,11 @@ export function PricingScreen({ navigation }: Props) {
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>Pricing</Text>
         <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]}>
-          Start free.{'\n'}Unlock every AI mode for {PREMIUM_PRICE_DISPLAY}.
+          Try free for {PREMIUM_TRIAL_DAYS} days.{'\n'}Then {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}.
         </Text>
         <Text style={styles.heroSub}>
-          One-time purchase. No subscription, no auto-renew. Pay once and keep every
-          premium feature across Web, iOS, and Android.
+          Start your {PREMIUM_TRIAL_DAYS}-day free trial — every AI mode, today's fortune
+          lucky numbers, deeper analytics, and all six lottery games. Cancel anytime.
         </Text>
       </View>
 
@@ -215,12 +225,12 @@ export function PricingScreen({ navigation }: Props) {
             <Text style={[styles.priceCurrency, styles.priceOnFeatured]}>$</Text>
             <Text style={[styles.priceAmount, styles.priceOnFeatured]}>4.99</Text>
             <Text style={[styles.priceUnit, styles.priceOnFeatured]}>
-              / one-time
+              {PREMIUM_PRICE_PERIOD}
             </Text>
           </View>
           <Text style={[styles.planSub, styles.planSubOnFeatured]}>
-            Every AI mode, deeper analytics, and unlimited saved sets — on every
-            device you sign into.
+            {PREMIUM_TRIAL_DAYS}-day free trial, then {PREMIUM_PRICE_DISPLAY}/month. Every AI mode,
+            today's fortune, deeper analytics, and unlimited saved sets. Cancel anytime.
           </Text>
           <View style={styles.planBullets}>
             <Bullet
@@ -234,8 +244,33 @@ export function PricingScreen({ navigation }: Props) {
           </View>
 
           {isPremium ? (
-            <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>✓ Premium active</Text>
+            <View style={{ marginTop: 'auto' }}>
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>
+                  {isTrialing ? '✓ Free trial active' : '✓ Premium active'}
+                </Text>
+              </View>
+              {currentPeriodEnd ? (
+                <Text style={styles.fineprint}>
+                  {cancelAtPeriodEnd
+                    ? `Cancels on ${formatDate(currentPeriodEnd)}.`
+                    : isTrialing
+                      ? `Trial ends ${formatDate(currentPeriodEnd)}, then ${PREMIUM_PRICE_DISPLAY}/mo.`
+                      : `Renews ${formatDate(currentPeriodEnd)}.`}
+                </Text>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.planCta, styles.planCtaGhostDark]}
+                onPress={handleManage}
+                activeOpacity={0.88}
+                disabled={checkoutStatus === 'portal'}
+              >
+                {checkoutStatus === 'portal' ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.planCtaGhostDarkText}>Manage subscription</Text>
+                )}
+              </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
@@ -252,7 +287,7 @@ export function PricingScreen({ navigation }: Props) {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.planCtaPrimaryText}>
-                  {user ? `Unlock Premium — ${PREMIUM_PRICE_DISPLAY}` : 'Sign in to unlock'}
+                  {user ? `Start ${PREMIUM_TRIAL_DAYS}-day free trial` : 'Sign in to start free trial'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -270,7 +305,7 @@ export function PricingScreen({ navigation }: Props) {
           ) : null}
 
           <Text style={styles.fineprint}>
-            {`Secure checkout via Stripe on the web, and via Apple / Google in-app\npurchase on mobile. Prices shown in ${PREMIUM_CURRENCY}; taxes may apply.`}
+            {`Secure checkout & billing via Stripe. ${PREMIUM_TRIAL_DAYS}-day free trial, then ${PREMIUM_PRICE_DISPLAY}/month in ${PREMIUM_CURRENCY}. Cancel anytime; taxes may apply.`}
           </Text>
         </View>
       </View>
@@ -305,8 +340,12 @@ export function PricingScreen({ navigation }: Props) {
       <View style={styles.faq}>
         <Text style={styles.faqTitle}>Questions, answered</Text>
         <Faq
-          q="Will I be charged every month?"
-          a="No. Premium is a one-time purchase. Once you unlock it, the features stay on your account with no recurring charge."
+          q={`How does the ${PREMIUM_TRIAL_DAYS}-day free trial work?`}
+          a={`You get full Premium access free for ${PREMIUM_TRIAL_DAYS} days. If you don't cancel before the trial ends, your card is charged ${PREMIUM_PRICE_DISPLAY}/month. You can cancel anytime from "Manage subscription".`}
+        />
+        <Faq
+          q="Can I cancel anytime?"
+          a="Yes. Open “Manage subscription” to cancel in a couple of clicks. You keep Premium until the end of the current billing period — no further charges after that."
         />
         <Faq
           q="Is LottoDream an official lottery operator?"
@@ -317,12 +356,8 @@ export function PricingScreen({ navigation }: Props) {
           a="No pattern, algorithm, or person can change the mathematical odds of a lottery draw. Premium gives you statistical analysis and more ways to choose numbers — not higher probability."
         />
         <Faq
-          q="Can I get a refund?"
-          a="Web purchases via Stripe follow our refund policy — contact support within 14 days of purchase if the product is defective or if you were charged in error. Purchases made through the App Store or Google Play are governed by the store’s refund policy."
-        />
-        <Faq
-          q="Does one purchase work on all my devices?"
-          a="Yes. Sign in with the same account on Web, iOS, or Android and Premium features unlock automatically."
+          q="How do I get a refund?"
+          a={`Subscriptions are billed monthly via Stripe. If you were charged in error, contact ${SUPPORT_EMAIL} and we'll help. Cancel before your renewal date to avoid the next charge.`}
         />
       </View>
 
@@ -572,6 +607,18 @@ const styles = StyleSheet.create({
   planCtaPrimaryText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '700',
+    fontFamily: FONT_FAMILY,
+  },
+  planCtaGhostDark: {
+    marginTop: space.md,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  planCtaGhostDarkText: {
+    color: '#E2E8F0',
+    fontSize: 14,
     fontWeight: '700',
     fontFamily: FONT_FAMILY,
   },

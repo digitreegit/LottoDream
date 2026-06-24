@@ -2,10 +2,9 @@
 // Prediction Engine
 // Generates lottery number recommendations
 // ============================================
-import { Draw, PredictionSet, PredictionMode, AnalysisResult, GameType, GameConfig, LuckyDate } from '../types';
+import { Draw, PredictionSet, PredictionMode, AnalysisResult, GameType, GameConfig, LuckyDate, drawNumbers, drawBonus } from '../types';
 import { analyzeDraws } from './analysisEngine';
 import { getGameConfig } from '../config/constants';
-import * as Crypto from 'expo-crypto';
 
 /**
  * Generate a set of predicted numbers
@@ -48,16 +47,19 @@ export function generatePrediction(
       break;
   }
 
+  // Games without a bonus ball (Take 5, Pick 10) carry powerball = 0.
+  const bonus = config.hasBonus ? pb : 0;
+
   // Apply distribution filters for quality
-  const qualityScore = adjustScore(whites, pb, analysis, score, config);
-  const backtest = backtestPrediction(whites, pb, draws);
+  const qualityScore = adjustScore(whites, bonus, analysis, score, config);
+  const backtest = backtestPrediction(whites, bonus, draws, config);
   const finalScore = applyBacktestScoreBoost(qualityScore, backtest);
 
   return {
     id: generateId(),
     game,
     whites: whites.sort((a, b) => a - b),
-    powerball: pb,
+    powerball: bonus,
     mode,
     score: finalScore,
     backtest,
@@ -396,15 +398,16 @@ export function generateLuckyDatesPrediction(
     `${game}:lucky:${draws.length}:${luckyDates.map((d) => d.date).join('|')}${seedEntropy}`
   );
   const { whites, pb, score, explanation } = luckyDatesStrategy(luckyDates, analysis, config, rng);
-  const qualityScore = adjustScore(whites, pb, analysis, score, config);
-  const backtest = backtestPrediction(whites, pb, draws);
+  const bonus = config.hasBonus ? pb : 0;
+  const qualityScore = adjustScore(whites, bonus, analysis, score, config);
+  const backtest = backtestPrediction(whites, bonus, draws, config);
   const finalScore = applyBacktestScoreBoost(qualityScore, backtest);
 
   return {
     id: generateId(),
     game,
     whites: whites.sort((a, b) => a - b),
-    powerball: pb,
+    powerball: bonus,
     mode: 'lucky',
     score: finalScore,
     backtest,
@@ -441,15 +444,16 @@ export function monteCarloScore(
   };
 
   const sortedWhites = [...whites].sort((a, b) => a - b);
+  const mainCount = config.mainCount ?? config.whiteCount;
 
   for (let i = 0; i < simulations; i++) {
     // Generate random draw
     const simWhites: number[] = [];
-    while (simWhites.length < 5) {
+    while (simWhites.length < mainCount) {
       const n = Math.floor(Math.random() * config.whiteMax) + 1;
       if (!simWhites.includes(n)) simWhites.push(n);
     }
-    const simPB = Math.floor(Math.random() * config.bonusMax) + 1;
+    const simPB = config.hasBonus ? Math.floor(Math.random() * config.bonusMax) + 1 : 0;
 
     // Count matches
     const whiteMatches = sortedWhites.filter((n) => simWhites.includes(n)).length;
@@ -488,7 +492,7 @@ function hashString(input: string): number {
   return hash >>> 0;
 }
 
-function backtestPrediction(whites: number[], powerball: number, draws: Draw[]) {
+function backtestPrediction(whites: number[], powerball: number, draws: Draw[], config?: GameConfig) {
   const recent = draws.slice(0, 120);
   if (recent.length === 0) {
     return {
@@ -499,15 +503,16 @@ function backtestPrediction(whites: number[], powerball: number, draws: Draw[]) 
     };
   }
 
+  const hasBonus = config?.hasBonus ?? true;
   const whiteSet = new Set(whites);
   let totalWhiteMatches = 0;
   let pbHits = 0;
   let tier3Plus = 0;
 
   for (const draw of recent) {
-    const drawWhites = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5];
+    const drawWhites = drawNumbers(draw);
     const whiteMatches = drawWhites.filter((n) => whiteSet.has(n)).length;
-    const pbMatch = draw.powerball === powerball;
+    const pbMatch = hasBonus && drawBonus(draw) === powerball && powerball > 0;
     totalWhiteMatches += whiteMatches;
     if (pbMatch) pbHits++;
     if (whiteMatches >= 3 || (whiteMatches >= 2 && pbMatch)) tier3Plus++;

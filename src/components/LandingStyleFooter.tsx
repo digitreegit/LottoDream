@@ -2,8 +2,9 @@
 // Footer matching WebLandingPage (logo + attribution)
 // ============================================
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, Linking, TouchableOpacity } from 'react-native';
 import { LottoDreamLogo } from './LottoDreamLogo';
+import { SUPPORT_EMAIL } from '../config/constants';
 
 export function LandingStyleFooter() {
   return (
@@ -13,6 +14,12 @@ export function LandingStyleFooter() {
         <Text style={styles.footerText}>
           Data sourced from NY Open Data  •  Updated after every drawing
         </Text>
+        <TouchableOpacity
+          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.footerLink}>Support: {SUPPORT_EMAIL}</Text>
+        </TouchableOpacity>
         <Text style={styles.footerText}>
           © {new Date().getFullYear()} Lotto Dream. All rights reserved.
         </Text>
@@ -54,5 +61,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  footerLink: {
+    color: '#00A383',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 6,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : {}),
   },
 });

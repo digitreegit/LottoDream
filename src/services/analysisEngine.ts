@@ -2,7 +2,7 @@
 // Analysis Engine
 // Statistical analysis of lottery draws
 // ============================================
-import { Draw, AnalysisResult, NumberFrequency, GameConfig } from '../types';
+import { Draw, AnalysisResult, NumberFrequency, GameConfig, drawNumbers, drawBonus } from '../types';
 import { getGameConfig } from '../config/constants';
 
 /**
@@ -16,9 +16,11 @@ export function analyzeDraws(draws: Draw[], label: string, config?: GameConfig):
 
   const game = draws[0]?.game || 'powerball';
   const cfg = config || getGameConfig(game);
-  const whiteMax = cfg.whiteMax;
+  const whiteMax = cfg.mainMax ?? cfg.whiteMax;
   const bonusMax = cfg.bonusMax;
+  const hasBonus = cfg.hasBonus ?? bonusMax > 0;
   const lowHighSplit = cfg.lowHighSplit;
+  const mainCount = cfg.mainCount ?? cfg.whiteCount;
 
   // 1. Frequency counts
   const whiteCounts = new Map<number, number>();
@@ -47,7 +49,9 @@ export function analyzeDraws(draws: Draw[], label: string, config?: GameConfig):
 
   // Process each draw (sorted newest first)
   draws.forEach((draw, idx) => {
-    const whites = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5].sort((a, b) => a - b);
+    const whites = drawNumbers(draw).slice().sort((a, b) => a - b);
+    const bonus = drawBonus(draw);
+    const count = whites.length || mainCount;
 
     // White ball frequencies
     whites.forEach((n) => {
@@ -57,10 +61,12 @@ export function analyzeDraws(draws: Draw[], label: string, config?: GameConfig):
       }
     });
 
-    // Powerball frequency
-    pbCounts.set(draw.powerball, (pbCounts.get(draw.powerball) || 0) + 1);
-    if (lastSeenPB.get(draw.powerball) === totalDraws) {
-      lastSeenPB.set(draw.powerball, idx);
+    // Bonus ball frequency (skip games without a bonus)
+    if (hasBonus && bonus != null) {
+      pbCounts.set(bonus, (pbCounts.get(bonus) || 0) + 1);
+      if (lastSeenPB.get(bonus) === totalDraws) {
+        lastSeenPB.set(bonus, idx);
+      }
     }
 
     // Pairs
@@ -74,12 +80,12 @@ export function analyzeDraws(draws: Draw[], label: string, config?: GameConfig):
     // Odd/Even
     const oddCount = whites.filter((n) => n % 2 !== 0).length;
     totalOdd += oddCount;
-    totalEven += 5 - oddCount;
+    totalEven += count - oddCount;
 
     // Low/High (split depends on game config)
     const lowCount = whites.filter((n) => n <= lowHighSplit).length;
     totalLow += lowCount;
-    totalHigh += 5 - lowCount;
+    totalHigh += count - lowCount;
 
     // Sum
     const sum = whites.reduce((a, b) => a + b, 0);
@@ -133,7 +139,7 @@ export function analyzeDraws(draws: Draw[], label: string, config?: GameConfig):
     });
 
   // Overdue: numbers not seen for a long time relative to expected frequency
-  const expectedWhiteFreq = (5 / whiteMax);
+  const expectedWhiteFreq = (mainCount / whiteMax);
   const overdueThreshold = Math.ceil(1 / expectedWhiteFreq) * 1.5;
   const overdue = whiteFrequency
     .filter((f) => f.lastSeen >= overdueThreshold)
@@ -156,12 +162,12 @@ export function analyzeDraws(draws: Draw[], label: string, config?: GameConfig):
     overdue,
     pairs: topPairs,
     oddEvenRatio: {
-      odd: totalOdd / (totalDraws * 5),
-      even: totalEven / (totalDraws * 5),
+      odd: totalOdd / (totalDraws * mainCount),
+      even: totalEven / (totalDraws * mainCount),
     },
     lowHighRatio: {
-      low: totalLow / (totalDraws * 5),
-      high: totalHigh / (totalDraws * 5),
+      low: totalLow / (totalDraws * mainCount),
+      high: totalHigh / (totalDraws * mainCount),
     },
     sumRange: {
       min: Math.min(...sums),

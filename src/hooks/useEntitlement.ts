@@ -19,6 +19,16 @@ import { useAuth } from './useAuth';
 interface EntitlementState {
   profile: UserProfile | null;
   isPremium: boolean;
+  /** True while in the free trial window. */
+  isTrialing: boolean;
+  /** Raw Stripe-synced status, when available. */
+  status: string | null;
+  /** ISO timestamp when the trial ends, when trialing. */
+  trialEnd: string | null;
+  /** ISO timestamp when the current paid/trial period ends. */
+  currentPeriodEnd: string | null;
+  /** Whether the subscription is set to cancel at period end. */
+  cancelAtPeriodEnd: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -26,6 +36,11 @@ interface EntitlementState {
 const EntitlementContext = createContext<EntitlementState>({
   profile: null,
   isPremium: false,
+  isTrialing: false,
+  status: null,
+  trialEnd: null,
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
   loading: false,
   refresh: async () => undefined,
 });
@@ -94,9 +109,20 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [load]);
 
+  const status = profile?.subscription_status ?? null;
+  const isPremium =
+    profile?.subscription_tier === 'premium' ||
+    status === 'active' ||
+    status === 'trialing';
+
   const value: EntitlementState = {
     profile,
-    isPremium: profile?.subscription_tier === 'premium',
+    isPremium,
+    isTrialing: status === 'trialing',
+    status,
+    trialEnd: profile?.trial_end ?? null,
+    currentPeriodEnd: profile?.current_period_end ?? null,
+    cancelAtPeriodEnd: Boolean(profile?.cancel_at_period_end),
     loading,
     refresh: load,
   };

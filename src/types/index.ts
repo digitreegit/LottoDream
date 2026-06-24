@@ -2,8 +2,24 @@
 // LottoDream - Type Definitions
 // ============================================
 
-/** Supported lottery games */
-export type GameType = 'powerball' | 'megamillions';
+/**
+ * Supported lottery games.
+ * National multi-state: powerball, megamillions, cash4life.
+ * NY popular draw games: take5, nylotto, pick10.
+ */
+export type GameType =
+  | 'powerball'
+  | 'megamillions'
+  | 'cash4life'
+  | 'take5'
+  | 'nylotto'
+  | 'pick10';
+
+/** Reliability of a game's data source / sync, surfaced in UI. */
+export type GameDataReliability = 'stable' | 'beta';
+
+/** How draws for a game are persisted in Supabase. */
+export type GameStorageShape = 'legacy5' | 'array';
 
 /** Game configuration */
 export interface GameConfig {
@@ -11,10 +27,21 @@ export interface GameConfig {
   name: string;
   shortName: string;
   icon: string;
+  /** Canonical generalized fields */
+  mainCount: number;         // how many main numbers are drawn (5, 6, 20...)
+  mainMax: number;           // max value of a main number
+  hasBonus: boolean;         // whether the game has a bonus ball
+  bonusMax: number;          // max value of the bonus ball (0 when none)
+  drawsPerDay: number;       // 1 for most, 2 for Take 5 (midday/evening)
+  reliability: GameDataReliability;
+  storage: GameStorageShape; // legacy5 = n1..n5 columns, array = numbers[] column
+  /**
+   * Backwards-compatible aliases (kept so existing screens keep working).
+   * whiteMax === mainMax, whiteCount === mainCount.
+   */
   whiteMax: number;
-  bonusMax: number;
   whiteCount: number;
-  bonusLabel: string;        // "Powerball" or "Mega Ball"
+  bonusLabel: string;        // "Powerball", "Mega Ball", "Cash Ball", "Bonus"...
   multiplierLabel: string;   // "Power Play" or "Megaplier"
   accentColor: string;
   apiUrl: string;
@@ -23,19 +50,57 @@ export interface GameConfig {
   lowHighSplit: number;      // boundary for low/high analysis
 }
 
-/** A single lottery draw record (works for both games) */
+/**
+ * A single lottery draw record (generalized for all games).
+ *
+ * `numbers` + `bonus` are the canonical representation. The `n1..n5` /
+ * `powerball` fields are legacy aliases kept populated for 5-ball games so
+ * that older UI keeps rendering; new code should prefer `drawNumbers()` /
+ * `drawBonus()` helpers below.
+ */
 export interface Draw {
   id?: number;
   game: GameType;
   draw_date: string; // ISO date string
-  n1: number;
-  n2: number;
-  n3: number;
-  n4: number;
-  n5: number;
-  powerball: number;     // bonus ball (Powerball or Mega Ball)
-  powerplay: number | null; // multiplier
+  /** Canonical main numbers (length === game's mainCount). */
+  numbers: number[];
+  /** Canonical bonus ball, or null for games without one. */
+  bonus: number | null;
+  /** Which daily slot (Take 5 has midday/evening). */
+  slot?: 'midday' | 'evening' | null;
+  multiplier?: number | null; // generalized multiplier (Power Play / Megaplier)
+  // ---- Legacy aliases (5-ball games only) ----
+  n1?: number;
+  n2?: number;
+  n3?: number;
+  n4?: number;
+  n5?: number;
+  powerball?: number;        // bonus ball alias
+  powerplay?: number | null; // multiplier alias
   created_at?: string;
+}
+
+/** Canonical main numbers for a draw (handles legacy + array shapes). */
+export function drawNumbers(draw: Draw): number[] {
+  if (Array.isArray(draw.numbers) && draw.numbers.length > 0) return draw.numbers;
+  const legacy = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5].filter(
+    (n): n is number => typeof n === 'number'
+  );
+  return legacy;
+}
+
+/** Canonical bonus ball for a draw, or null when the game has none. */
+export function drawBonus(draw: Draw): number | null {
+  if (draw.bonus !== undefined && draw.bonus !== null) return draw.bonus;
+  if (typeof draw.powerball === 'number') return draw.powerball;
+  return null;
+}
+
+/** Canonical multiplier for a draw, or null. */
+export function drawMultiplier(draw: Draw): number | null {
+  if (draw.multiplier !== undefined && draw.multiplier !== null) return draw.multiplier;
+  if (draw.powerplay !== undefined && draw.powerplay !== null) return draw.powerplay;
+  return null;
 }
 
 /** Frequency stats for a single number */
@@ -108,17 +173,36 @@ export interface UserProfile {
   points: number;
   referral_code?: string;
   created_at: string;
-  /** 'basic' (free) or 'premium' (one-time $4.99 unlock). Backed by profiles.subscription_tier. */
+  /** 'basic' (free) or 'premium' ($4.99/mo subscription). Backed by profiles.subscription_tier. */
   subscription_tier?: SubscriptionTier;
   /** Timestamp when premium was activated (Stripe webhook / IAP receipt). */
   premium_since?: string | null;
   /** Which provider granted premium, for receipt display. */
   premium_source?: PremiumSource | null;
+  /** Stripe subscription status synced by the webhook. */
+  subscription_status?: SubscriptionStatus | null;
+  /** ISO timestamp the current paid/trial period ends. */
+  current_period_end?: string | null;
+  /** ISO timestamp the free trial ends (if trialing). */
+  trial_end?: string | null;
+  /** Whether the subscription will cancel at period end. */
+  cancel_at_period_end?: boolean | null;
 }
 
 export type SubscriptionTier = 'basic' | 'premium';
 
 export type PremiumSource = 'stripe' | 'apple_iap' | 'google_iap' | 'manual';
+
+/** Mirrors Stripe subscription.status values we care about. */
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'paused';
 
 /** Prediction modes that require a premium unlock. */
 export const PREMIUM_PREDICTION_MODES: readonly PredictionMode[] = [

@@ -21,7 +21,7 @@ import {
   type WebUserPlanTier,
 } from './WebUserMenuDropdown';
 
-export const APP_MENUS = ['Home', 'Analysis', 'Predict', 'Drawing', 'Pricing'] as const;
+export const APP_MENUS = ['Home', 'Predict', 'Fortune', 'Analysis', 'Drawing', 'FAQ', 'Pricing'] as const;
 export type WebMenuKey = (typeof APP_MENUS)[number];
 
 export type { WebUserMenuAction, WebUserPlanTier };

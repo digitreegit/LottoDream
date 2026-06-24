@@ -26,6 +26,8 @@ import { PredictScreen } from '../screens/PredictScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { MyPageScreen } from '../screens/MyPageScreen';
 import { PricingScreen } from '../screens/PricingScreen';
+import { FortuneScreen } from '../screens/FortuneScreen';
+import { FaqScreen } from '../screens/FaqScreen';
 import { WebLandingPage } from '../screens/WebLandingPage';
 import { WebLayout, type WebMenuKey, type WebUserMenuAction } from '../components/WebLayout';
 import { webDash } from '../theme/webDashboard';
@@ -202,6 +204,14 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="Fortune"
+        component={FortuneScreen}
+        options={{
+          tabBarLabel: 'Fortune',
+          tabBarIcon: ({ color }) => <PredictIcon color={color} />,
+        }}
+      />
+      <Tab.Screen
         name="History"
         component={HistoryScreen}
         options={{
@@ -220,6 +230,11 @@ function MainTabs() {
       <Tab.Screen
         name="Pricing"
         component={PricingScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen
+        name="FAQ"
+        component={FaqScreen}
         options={{ tabBarButton: () => null }}
       />
       <Tab.Screen
@@ -263,7 +278,7 @@ function LoggedInWebShell({
   const handleWebMenuPress = (menu: WebMenuKey) => {
     setWebActiveMenu(menu);
     const targetRoute = menu === 'Drawing' ? 'History' : menu;
-    webNavRef.current?.navigate(targetRoute);
+    webNavRef.current?.navigate(targetRoute as never);
   };
 
   const handleLogoPress = () => {
@@ -316,6 +331,8 @@ function LoggedInWebShell({
               routeName === 'Home' ||
               routeName === 'Analysis' ||
               routeName === 'Predict' ||
+              routeName === 'Fortune' ||
+              routeName === 'FAQ' ||
               routeName === 'Pricing'
             ) {
               setWebActiveMenu(routeName);
@@ -339,9 +356,11 @@ function LoggedInWebShell({
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Analysis" component={AnalysisScreen} />
             <Tab.Screen name="Predict" component={PredictScreen} />
+            <Tab.Screen name="Fortune" component={FortuneScreen} />
             <Tab.Screen name="History" component={HistoryScreen} />
             <Tab.Screen name="MyPage" component={MyPageScreen} />
             <Tab.Screen name="Pricing" component={PricingScreen} />
+            <Tab.Screen name="FAQ" component={FaqScreen} />
             <Tab.Screen name="TermsOfService" component={TermsOfServiceScreen} />
             <Tab.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           </Tab.Navigator>

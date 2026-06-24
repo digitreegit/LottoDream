@@ -63,12 +63,19 @@ export function PrivacyPolicyScreen({ navigation }: any) {
           (Powerball / Mega Millions), and preferences.
         </Text>
         <Text style={styles.p}>
-          <Text style={styles.strong}>Payment data.</Text> When you purchase the Premium
-          unlock, the card number and CVC are entered directly into our payment
-          processor (Stripe on web; Apple / Google for in-app purchases) and are never
-          sent to our servers. We receive a transaction ID, the last four digits of
-          your card, the amount, and the status of the payment for accounting and
-          receipt purposes.
+          <Text style={styles.strong}>Birthdate (Today's Fortune).</Text> If you use the
+          Today's Fortune feature, the birthdate you enter is processed only in your
+          browser to generate that day's reading and lucky numbers. It is never
+          transmitted to our servers, never linked to your account, and is discarded
+          when you leave the page. We do not store your birthdate.
+        </Text>
+        <Text style={styles.p}>
+          <Text style={styles.strong}>Payment data.</Text> When you subscribe to Premium
+          ({'$'}4.99/month with a {String(7)}-day free trial), your card number and CVC are
+          entered directly into our payment processor (Stripe) and are never sent to our
+          servers. We receive a transaction ID, the last four digits of your card, the
+          amount, the subscription status, and renewal dates for accounting and receipt
+          purposes.
         </Text>
         <Text style={styles.p}>
           <Text style={styles.strong}>Device & usage data.</Text> IP address, device and

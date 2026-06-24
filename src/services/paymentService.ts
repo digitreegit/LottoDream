@@ -1,86 +1,80 @@
 // ============================================
-// Payment Service – one-time Premium unlock
+// Payment Service – monthly Premium subscription (web)
 // ============================================
 //
-// Strategy:
-//   • Web: open Stripe Checkout (Payment Link) in a new tab. A Stripe webhook
-//     server-side flips `profiles.subscription_tier` to 'premium' and inserts
-//     a row in `purchases`.
-//   • iOS / Android: App Store & Google Play require first-party IAP for
-//     digital unlocks. The real implementation should call StoreKit 2 or
-//     Google Billing via Expo modules / RevenueCat. Until that is wired
-//     (needs a native prebuild), mobile users are directed to the web
-//     purchase flow or see an "in-app purchase coming soon" notice.
+// Strategy (web-only):
+//   • `startPremiumCheckout()` calls the Supabase Edge Function
+//     `create-checkout-session`, which returns a Stripe Checkout URL for the
+//     $4.99/mo subscription (7-day free trial). We redirect the current tab.
+//   • A Stripe webhook (`stripe-webhook` Edge Function) flips
+//     `profiles.subscription_tier` to 'premium' for active/trialing subs.
+//   • `openBillingPortal()` calls `create-billing-portal-session` so the user
+//     can manage or cancel their subscription.
 //
-// Development:
-//   • __DEV__ builds expose `simulatePremiumGrant()` so you can test gated UI
-//     flows without real payments. In production this function is a no-op.
-//
-import { Platform, Linking } from 'react-native';
 import { supabase } from '../config/supabase';
 import {
   PREMIUM_PRODUCT_ID,
   PREMIUM_PRICE_CENTS,
   PREMIUM_CURRENCY,
-  STRIPE_PREMIUM_CHECKOUT_URL,
 } from '../config/constants';
 
 export type CheckoutOutcome =
   | { status: 'redirected'; provider: 'stripe' }
-  | { status: 'unsupported'; provider: 'apple_iap' | 'google_iap'; reason: string }
   | { status: 'error'; reason: string };
 
-/**
- * Kick off the Premium purchase flow for the current platform.
- * Resolves as soon as the flow is handed off to Stripe / the store.
- * Actual entitlement flip is observed asynchronously via `useEntitlement().refresh()`.
- */
-export async function startPremiumCheckout(opts?: {
-  userId?: string;
-  email?: string;
-}): Promise<CheckoutOutcome> {
-  try {
-    if (Platform.OS === 'web') {
-      if (typeof window === 'undefined') {
-        return { status: 'error', reason: 'Checkout unavailable in this environment.' };
-      }
-      const url = new URL(STRIPE_PREMIUM_CHECKOUT_URL);
-      if (opts?.userId) url.searchParams.set('client_reference_id', opts.userId);
-      if (opts?.email) url.searchParams.set('prefilled_email', opts.email);
-      url.searchParams.set('product', PREMIUM_PRODUCT_ID);
-      window.open(url.toString(), '_blank', 'noopener,noreferrer');
-      return { status: 'redirected', provider: 'stripe' };
-    }
+async function invokeFunction(name: string): Promise<{ url?: string; error?: string }> {
+  const { data, error } = await supabase.functions.invoke(name, { body: {} });
+  if (error) {
+    // Surface the function's JSON error message when available.
+    const ctxBody = (error as any)?.context?.body;
+    return { error: ctxBody?.error || error.message || 'Request failed.' };
+  }
+  return { url: (data as any)?.url, error: (data as any)?.error };
+}
 
-    // Native: real IAP integration is a follow-up. For now, redirect to the
-    // web checkout via the default browser so testers can still pay.
-    const url = STRIPE_PREMIUM_CHECKOUT_URL;
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
-      await Linking.openURL(url);
-      return {
-        status: 'unsupported',
-        provider: Platform.OS === 'ios' ? 'apple_iap' : 'google_iap',
-        reason:
-          'In-app purchase is coming soon. We opened the secure web checkout in your browser.',
-      };
+/**
+ * Start the Premium subscription checkout flow. Resolves after redirecting the
+ * browser to Stripe Checkout. Entitlement is observed asynchronously via
+ * `useEntitlement().refresh()` / realtime profile updates.
+ */
+export async function startPremiumCheckout(): Promise<CheckoutOutcome> {
+  try {
+    if (typeof window === 'undefined') {
+      return { status: 'error', reason: 'Checkout is only available on the web.' };
     }
-    return {
-      status: 'unsupported',
-      provider: Platform.OS === 'ios' ? 'apple_iap' : 'google_iap',
-      reason: 'In-app purchase will be available in a future update.',
-    };
+    const { url, error } = await invokeFunction('create-checkout-session');
+    if (error || !url) {
+      return { status: 'error', reason: error || 'Could not start checkout.' };
+    }
+    window.location.assign(url);
+    return { status: 'redirected', provider: 'stripe' };
   } catch (err: any) {
     return { status: 'error', reason: err?.message || 'Checkout failed.' };
   }
 }
 
 /**
+ * Open the Stripe Billing Portal so the user can manage / cancel their plan.
+ */
+export async function openBillingPortal(): Promise<CheckoutOutcome> {
+  try {
+    if (typeof window === 'undefined') {
+      return { status: 'error', reason: 'Billing portal is only available on the web.' };
+    }
+    const { url, error } = await invokeFunction('create-billing-portal-session');
+    if (error || !url) {
+      return { status: 'error', reason: error || 'Could not open billing portal.' };
+    }
+    window.location.assign(url);
+    return { status: 'redirected', provider: 'stripe' };
+  } catch (err: any) {
+    return { status: 'error', reason: err?.message || 'Could not open billing portal.' };
+  }
+}
+
+/**
  * DEVELOPMENT ONLY. Marks the current user as premium without a real payment.
- * Used to exercise gated UI in staging. No-op in production builds.
- *
- * In a real deployment, never expose this — production entitlement flips
- * must come from a verified Stripe / Apple / Google webhook.
+ * No-op in production builds.
  */
 export async function simulatePremiumGrant(): Promise<{ error: string | null }> {
   if (!__DEV__) {
@@ -95,6 +89,7 @@ export async function simulatePremiumGrant(): Promise<{ error: string | null }> 
     .from('profiles')
     .update({
       subscription_tier: 'premium',
+      subscription_status: 'active',
       premium_since: new Date().toISOString(),
       premium_source: 'manual',
     })

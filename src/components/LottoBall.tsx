@@ -4,6 +4,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { GameType } from '../types';
+import { getGameConfig } from '../config/constants';
 
 interface LottoBallProps {
   number: number;
@@ -13,10 +14,9 @@ interface LottoBallProps {
   highlight?: boolean;
 }
 
-const BONUS_COLORS: Record<GameType, string> = {
-  powerball: '#E53E3E',
-  megamillions: '#D69E2E',
-};
+function bonusColor(game: GameType): string {
+  return getGameConfig(game)?.accentColor || '#E53E3E';
+}
 
 export function LottoBall({
   number,
@@ -26,7 +26,7 @@ export function LottoBall({
   highlight = false,
 }: LottoBallProps) {
   const bgColor = isBonus
-    ? BONUS_COLORS[game]
+    ? bonusColor(game)
     : highlight
     ? '#F6AD55'
     : '#3182CE';
@@ -61,16 +61,23 @@ interface LottoRowProps {
   powerball: number;
   game?: GameType;
   size?: number;
+  /** Force-hide the bonus ball (e.g. Take 5 / Pick 10). Defaults to auto (hide when 0). */
+  showBonus?: boolean;
 }
 
-export function LottoRow({ whites, powerball, game = 'powerball', size = 44 }: LottoRowProps) {
+export function LottoRow({ whites, powerball, game = 'powerball', size = 44, showBonus }: LottoRowProps) {
+  const renderBonus = showBonus ?? (powerball != null && powerball > 0);
   return (
     <View style={styles.row}>
       {whites.map((n, i) => (
         <LottoBall key={`w${i}`} number={n} size={size} />
       ))}
-      <View style={styles.separator} />
-      <LottoBall number={powerball} isBonus game={game} size={size} />
+      {renderBonus && (
+        <>
+          <View style={styles.separator} />
+          <LottoBall number={powerball} isBonus game={game} size={size} />
+        </>
+      )}
     </View>
   );
 }

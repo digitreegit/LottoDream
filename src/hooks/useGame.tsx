@@ -3,8 +3,8 @@
 // ============================================
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { GameType, GameConfig } from '../types';
-import { getGameConfig, GAME_CONFIGS } from '../config/constants';
-import { View, TouchableOpacity, StyleSheet, Image, Platform } from 'react-native';
+import { getGameConfig, GAME_CONFIGS, GAME_ORDER } from '../config/constants';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import { isWebDashboard, webDash } from '../theme/webDashboard';
 
 interface GameContextValue {
@@ -34,93 +34,111 @@ export function useGame() {
   return useContext(GameContext);
 }
 
-/** Toggle button between Powerball and Mega Millions */
+/** Horizontal chip selector across all supported games. */
 export function GameSelector({ light }: { light?: boolean }) {
   const { game, setGame } = useGame();
-  const games: GameType[] = ['powerball', 'megamillions'];
-
-  const logoMap = {
-    powerball: require('../../assets/powerball-logo.png'),
-    megamillions: require('../../assets/mega-millions-logo.png'),
-  };
+  const dark = !light || !isWebDashboard;
 
   return (
-    <View style={[styles.container, light && isWebDashboard && styles.containerLight]}>
-      {games.map((g) => {
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+      style={styles.scroll}
+    >
+      {GAME_ORDER.map((g) => {
         const cfg = getGameConfig(g);
         const active = game === g;
+        const accent = cfg.accentColor;
         return (
           <TouchableOpacity
             key={g}
-            style={[
-              styles.tab,
-              light && styles.tabLight,
-              light &&
-                isWebDashboard &&
-                active && {
-                  backgroundColor: `${cfg.accentColor}18`,
-                  borderColor: cfg.accentColor,
-                  ...(Platform.OS === 'web'
-                    ? ({ boxShadow: '0 0 0 2px rgba(15, 23, 42, 0.06)' } as object)
-                    : {}),
-                },
-              light && isWebDashboard && !active && styles.tabLightIdle,
-              light &&
-                active &&
-                !isWebDashboard && { backgroundColor: cfg.accentColor + '33', borderColor: cfg.accentColor },
-              !light && active && { backgroundColor: cfg.accentColor + '33', borderColor: cfg.accentColor },
-            ]}
             onPress={() => setGame(g)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            style={[
+              styles.chip,
+              dark ? styles.chipDark : styles.chipLight,
+              active && { borderColor: accent, backgroundColor: `${accent}1F` },
+              active &&
+                Platform.OS === 'web' &&
+                ({ boxShadow: `0 0 0 2px ${accent}33` } as object),
+            ]}
           >
-            <Image
-              source={logoMap[g as keyof typeof logoMap]}
-              style={[styles.logo, active && { opacity: 1 }, !active && { opacity: 0.6 }]}
-            />
+            <Text style={styles.chipIcon}>{cfg.icon}</Text>
+            <View>
+              <Text
+                style={[
+                  styles.chipName,
+                  dark ? styles.chipNameDark : styles.chipNameLight,
+                  active && { color: accent },
+                ]}
+                numberOfLines={1}
+              >
+                {cfg.name}
+              </Text>
+              {cfg.reliability === 'beta' ? (
+                <Text style={styles.chipBeta}>BETA</Text>
+              ) : null}
+            </View>
           </TouchableOpacity>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
+const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+  scroll: {
     marginVertical: 8,
+    flexGrow: 0,
   },
-  containerLight: {
-    padding: 6,
+  scrollContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: webDash.cardBg,
     borderWidth: 1,
-    borderColor: webDash.cardBorder,
-    gap: 6,
-    ...(Platform.OS === 'web' ? ({ boxShadow: webDash.shadowCard } as object) : {}),
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' as const } as object) : {}),
   },
-  tab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+  chipLight: {
+    backgroundColor: webDash.cardBg,
+    borderColor: webDash.cardBorder,
+  },
+  chipDark: {
     backgroundColor: '#1A2744',
-    borderWidth: 1.5,
     borderColor: '#2D3748',
   },
-  tabLight: {
-    backgroundColor: '#FFFFFF',
-    borderColor: webDash.cardBorder,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+  chipIcon: {
+    fontSize: 18,
   },
-  tabLightIdle: {
-    opacity: 0.92,
+  chipName: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: FONT,
   },
-  logo: {
-    width: 60,
-    height: 40,
-    resizeMode: 'contain',
+  chipNameLight: {
+    color: webDash.textPrimary,
+  },
+  chipNameDark: {
+    color: '#E2E8F0',
+  },
+  chipBeta: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: '#F59E0B',
+    fontFamily: FONT,
   },
 });

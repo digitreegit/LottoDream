@@ -15,7 +15,7 @@ import { LandingStyleFooter } from '../components/LandingStyleFooter';
 import { LottoRow } from '../components/LottoBall';
 import { useDraws } from '../hooks/useDraws';
 import { useGame, GameSelector } from '../hooks/useGame';
-import { Draw } from '../types';
+import { Draw, drawNumbers, drawBonus, drawMultiplier } from '../types';
 import { isWebDashboard, webDash, nativeDash, webDashboardScrollContent } from '../theme/webDashboard';
 
 const C = isWebDashboard ? webDash : nativeDash;
@@ -36,7 +36,8 @@ export function HistoryScreen() {
     if (nums.length === 0) return draws;
 
     return draws.filter((draw) => {
-      const drawNums = [draw.n1, draw.n2, draw.n3, draw.n4, draw.n5, draw.powerball];
+      const bonus = drawBonus(draw);
+      const drawNums = [...drawNumbers(draw), ...(bonus != null ? [bonus] : [])];
       return nums.every((n) => drawNums.includes(n));
     });
   }, [draws, search]);
@@ -60,14 +61,14 @@ export function HistoryScreen() {
           </Text>
         </View>
         <LottoRow
-          whites={[item.n1, item.n2, item.n3, item.n4, item.n5]}
-          powerball={item.powerball}
+          whites={drawNumbers(item)}
+          powerball={drawBonus(item) ?? 0}
           game={game}
           size={34}
         />
-        {item.powerplay && (
-          <Text style={styles.pp}>{config.shortName}: {item.powerplay}x</Text>
-        )}
+        {drawMultiplier(item) ? (
+          <Text style={styles.pp}>{config.shortName}: {drawMultiplier(item)}x</Text>
+        ) : null}
       </View>
     );
   };

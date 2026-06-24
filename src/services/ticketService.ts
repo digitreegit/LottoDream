@@ -33,7 +33,66 @@ function formatPostgrestError(error: PostgrestError | null): string {
 }
 
 function mapWhites(row: any): number[] {
-  return [row.n1, row.n2, row.n3, row.n4, row.n5].map((value) => Number(value));
+  if (Array.isArray(row.numbers) && row.numbers.length > 0) {
+    return row.numbers.map((value: any) => Number(value));
+  }
+  return [row.n1, row.n2, row.n3, row.n4, row.n5]
+    .filter((v) => v != null)
+    .map((value) => Number(value));
+}
+
+function mapBonus(row: any): number {
+  if (row.bonus != null) return Number(row.bonus);
+  if (row.powerball != null) return Number(row.powerball);
+  return 0;
+}
+
+/**
+ * Build the DB row for a saved set, generalized across games. Writes the
+ * canonical `numbers` array + `bonus`, plus legacy n1..n5 / powerball when the
+ * game has exactly 5 mains so older readers keep working.
+ */
+function buildSavedRow(game: GameType, whites: number[], bonus: number): Record<string, unknown> {
+  const sorted = [...whites].sort((a, b) => a - b);
+  const row: Record<string, unknown> = {
+    game,
+    numbers: sorted,
+    bonus: bonus > 0 ? bonus : null,
+  };
+  if (sorted.length === 5) {
+    row.n1 = sorted[0];
+    row.n2 = sorted[1];
+    row.n3 = sorted[2];
+    row.n4 = sorted[3];
+    row.n5 = sorted[4];
+    row.powerball = bonus > 0 ? bonus : 0;
+  }
+  return row;
+}
+
+/** Validate a candidate set against a game's config. Returns an error string or null. */
+function validateSet(game: GameType, whites: number[], bonus: number): string | null {
+  const cfg = getGameConfig(game);
+  if (!Array.isArray(whites) || whites.length !== cfg.mainCount) {
+    return `Enter exactly ${cfg.mainCount} main numbers.`;
+  }
+  if (whites.some((n) => typeof n !== 'number' || !Number.isFinite(n))) {
+    return 'Main numbers must be valid numbers.';
+  }
+  if (new Set(whites).size !== cfg.mainCount) {
+    return 'Main numbers must be unique.';
+  }
+  for (const n of whites) {
+    if (n < 1 || n > cfg.mainMax) {
+      return `Each main number must be between 1 and ${cfg.mainMax}.`;
+    }
+  }
+  if (cfg.hasBonus) {
+    if (typeof bonus !== 'number' || !Number.isFinite(bonus) || bonus < 1 || bonus > cfg.bonusMax) {
+      return `${cfg.bonusLabel || 'Bonus'} must be between 1 and ${cfg.bonusMax}.`;
+    }
+  }
+  return null;
 }
 
 function nextDrawDate(game: GameType): string {
@@ -71,26 +130,18 @@ export async function savePredictionSet(prediction: PredictionSet): Promise<{ er
   }
 
   const w = prediction.whites;
-  if (!Array.isArray(w) || w.length !== 5 || w.some((n) => typeof n !== 'number' || !Number.isFinite(n))) {
-    return { error: 'Invalid number set (expected 5 main numbers).' };
-  }
   const pb = prediction.powerball;
-  if (typeof pb !== 'number' || !Number.isFinite(pb)) {
-    return { error: 'Invalid bonus ball.' };
+  const validationError = validateSet(prediction.game, w, pb);
+  if (validationError) {
+    return { error: validationError };
   }
 
   const { data, error } = await supabase
     .from('saved_numbers')
     .insert({
       user_id: user.id,
-      game: prediction.game,
       name: `${prediction.game}-${prediction.mode}-${new Date().toISOString().slice(0, 10)}`,
-      n1: w[0],
-      n2: w[1],
-      n3: w[2],
-      n4: w[3],
-      n5: w[4],
-      powerball: pb,
+      ...buildSavedRow(prediction.game, w, pb),
     })
     .select('id')
     .maybeSingle();
@@ -196,7 +247,7 @@ export async function getSavedNumberSets(limit = 20): Promise<SavedNumberSet[]> 
     game: row.game,
     name: row.name,
     whites: mapWhites(row),
-    powerball: Number(row.powerball),
+    powerball: mapBonus(row),
     created_at: row.created_at,
   }));
 }
@@ -222,7 +273,7 @@ export async function getNumberCollectionItems(limit = 50): Promise<NumberCollec
     name: row.name,
     source: String(row.source || 'manual'),
     whites: mapWhites(row),
-    powerball: Number(row.powerball),
+    powerball: mapBonus(row),
     created_at: row.created_at,
   }));
 }
@@ -248,35 +299,17 @@ export async function addNumberCollectionItem(input: {
     };
   }
 
-  const cfg = getGameConfig(input.game);
   const w = input.whites;
-  if (!Array.isArray(w) || w.length !== 5 || w.some((n) => typeof n !== 'number' || !Number.isFinite(n))) {
-    return { error: 'Enter exactly 5 main numbers.' };
-  }
-  const sorted = [...w].sort((a, b) => a - b);
-  if (new Set(sorted).size !== 5) {
-    return { error: 'Main numbers must be unique.' };
-  }
-  for (const n of sorted) {
-    if (n < 1 || n > cfg.whiteMax) {
-      return { error: `Each main number must be between 1 and ${cfg.whiteMax}.` };
-    }
-  }
   const pb = input.powerball;
-  if (typeof pb !== 'number' || !Number.isFinite(pb) || pb < 1 || pb > cfg.bonusMax) {
-    return { error: `${cfg.bonusLabel} must be between 1 and ${cfg.bonusMax}.` };
+  const validationError = validateSet(input.game, w, pb);
+  if (validationError) {
+    return { error: validationError };
   }
 
   const row: Record<string, unknown> = {
     user_id: user.id,
-    game: input.game,
     source: input.source,
-    n1: sorted[0],
-    n2: sorted[1],
-    n3: sorted[2],
-    n4: sorted[3],
-    n5: sorted[4],
-    powerball: pb,
+    ...buildSavedRow(input.game, w, pb),
   };
   const trimmedName = input.name?.trim();
   if (trimmedName) row.name = trimmedName;
@@ -323,7 +356,7 @@ export async function getTicketPurchases(limit = 20): Promise<TicketPurchase[]> 
     user_id: row.user_id,
     game: row.game,
     whites: mapWhites(row),
-    powerball: Number(row.powerball),
+    powerball: mapBonus(row),
     draw_date: row.draw_date,
     points_spent: Number(row.points_spent),
     status: row.status,

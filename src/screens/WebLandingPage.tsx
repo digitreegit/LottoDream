@@ -18,7 +18,7 @@ import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
 import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
 import { WEB_CONTENT_MAX_WIDTH } from '../theme/webDashboard';
-import { PREMIUM_PRICE_DISPLAY } from '../config/constants';
+import { PREMIUM_PRICE_DISPLAY, PREMIUM_PRICE_PERIOD, PREMIUM_TRIAL_DAYS } from '../config/constants';
 
 interface Props {
   onLogin: () => void;
@@ -205,8 +205,9 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
           <Text style={styles.heroTitleAccent}>Powered by AI</Text>
         </Text>
         <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
-          Analyze Powerball & Mega Millions draw history, discover hot/cold patterns,
-          and generate AI-powered number picks — all in one place.
+          Pick numbers the fun way across 6 games — Powerball, Mega Millions, Cash4Life,
+          Take 5, NY Lotto & Pick 10. AI strategies, Today's Fortune lucky numbers, and
+          win-quality visualizations. Try Premium free for {PREMIUM_TRIAL_DAYS} days.
         </Text>
         <View style={[styles.heroCtas, isWide && styles.heroCtasWide]}>
           <TouchableOpacity
@@ -351,11 +352,12 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       <View style={[styles.pricingBand, isWide && styles.pricingBandWide]}>
         <Text style={styles.pricingEyebrow}>PRICING</Text>
         <Text style={[styles.pricingHeading, isWide && styles.pricingHeadingWide]}>
-          Simple, one-time pricing
+          {PREMIUM_TRIAL_DAYS} days free, then {PREMIUM_PRICE_DISPLAY}/month
         </Text>
         <Text style={styles.pricingSub}>
-          Pure Random stays free forever. Unlock Hot, Cold, Balanced, Anti-Crowd & Lucky
-          Dates with a single {PREMIUM_PRICE_DISPLAY} purchase — no subscription.
+          Pure Random stays free forever. Start a {PREMIUM_TRIAL_DAYS}-day free trial to unlock
+          all AI modes, Today's Fortune lucky numbers & win-quality visualizations — then{' '}
+          {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}. Cancel anytime.
         </Text>
 
         <View
@@ -377,11 +379,12 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             </Text>
             <Text style={[styles.pricingCardPrice, styles.pricingCardPricePro]}>
               {PREMIUM_PRICE_DISPLAY}
-              <Text style={styles.pricingCardPriceNote}> · one-time</Text>
+              <Text style={styles.pricingCardPriceNote}> {PREMIUM_PRICE_PERIOD} · {PREMIUM_TRIAL_DAYS}-day trial</Text>
             </Text>
             <Text style={styles.pricingCardLine}>• All 5 AI prediction modes</Text>
-            <Text style={styles.pricingCardLine}>• Lucky Dates personalization</Text>
-            <Text style={styles.pricingCardLine}>• Unlimited saved tickets & history export</Text>
+            <Text style={styles.pricingCardLine}>• Today's Fortune lucky numbers</Text>
+            <Text style={styles.pricingCardLine}>• Win-quality visualizations</Text>
+            <Text style={styles.pricingCardLine}>• All 6 games & unlimited saves</Text>
             <Text style={styles.pricingCardLine}>• Priority support</Text>
           </View>
         </View>
@@ -466,18 +469,18 @@ const FEATURES = [
     svgPath: FEATURE_AI_PATH,
   },
   {
-    title: 'Lucky Numbers',
-    desc: 'Convert birthdays, anniversaries, and special dates into number sets you can play.',
+    title: "Today's Fortune",
+    desc: 'Enter your birthdate for a daily luck reading and matching lucky numbers — never stored, just for you.',
     svgPath: FEATURE_BOLT_PATH,
   },
   {
-    title: 'Draw History',
-    desc: 'Complete draw history with search & filters. Never miss a result again.',
+    title: '6 Lottery Games',
+    desc: 'Powerball, Mega Millions, Cash4Life, Take 5, NY Lotto & Pick 10 — pick numbers across all of them.',
     svgPath: FEATURE_HISTORY_PATH,
   },
   {
-    title: 'Cross-Platform',
-    desc: 'Use on the web, iOS, or Android — your account and data sync everywhere.',
+    title: 'Win-Quality Visuals',
+    desc: 'See each pick’s statistical quality, backtest results, and simulated match likelihood at a glance.',
     svgPath: FEATURE_PLATFORM_PATH,
   },
   {
