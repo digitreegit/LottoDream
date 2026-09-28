@@ -1,9 +1,13 @@
 // ============================================
 // Landing page — advertised annuitized jackpot + next draw date
-// 1) Texas Lottery HTML (works on native; web often blocked by CORS)
-// 2) Jina Reader markdown (https://r.jina.ai/...) — CORS-friendly for Expo Web
-// 3) EXPO_PUBLIC_LANDING_* env fallbacks
+// Web: the `jackpots` Edge Function (scrapes server-side; the browser is
+//      blocked by CORS on texaslottery.com).
+// Native: Texas Lottery HTML directly, then Jina Reader markdown.
+// Both: EXPO_PUBLIC_LANDING_* env fallbacks.
 // ============================================
+import { Platform } from 'react-native';
+import { EDGE_FUNCTIONS_URL } from '../config/constants';
+
 export type LandingJackpotDisplay = {
   amountDisplay: string;
   nextDrawDate: Date;
@@ -119,6 +123,26 @@ async function jackpotForTexasPage(
   return md ? parseJinaJackpotMarkdown(md) : null;
 }
 
+type EdgeJackpot = { amountDisplay: string; nextDrawDate: string } | null;
+
+function fromEdge(j: EdgeJackpot | undefined): LandingJackpotDisplay | null {
+  if (!j?.amountDisplay || !/^\d{4}-\d{2}-\d{2}$/.test(j.nextDrawDate)) return null;
+  return { amountDisplay: j.amountDisplay, nextDrawDate: new Date(`${j.nextDrawDate}T12:00:00`) };
+}
+
+/** Server-side scrape via the public `jackpots` Edge Function (GET, HTTP-cached). */
+async function fetchEdgeJackpots(): Promise<[LandingJackpotDisplay | null, LandingJackpotDisplay | null]> {
+  if (!EDGE_FUNCTIONS_URL) return [null, null];
+  try {
+    const res = await fetch(`${EDGE_FUNCTIONS_URL}/jackpots`);
+    if (!res.ok) return [null, null];
+    const body = (await res.json()) as { powerball?: EdgeJackpot; megamillions?: EdgeJackpot };
+    return [fromEdge(body.powerball), fromEdge(body.megamillions)];
+  } catch {
+    return [null, null];
+  }
+}
+
 export async function fetchLandingGameJackpots(): Promise<{
   powerball: LandingJackpotDisplay | null;
   megamillions: LandingJackpotDisplay | null;
@@ -126,10 +150,13 @@ export async function fetchLandingGameJackpots(): Promise<{
   const pbEnv = envJackpot('EXPO_PUBLIC_LANDING_PB_JACKPOT', 'EXPO_PUBLIC_LANDING_PB_NEXT_DRAW_ISO');
   const mmEnv = envJackpot('EXPO_PUBLIC_LANDING_MM_JACKPOT', 'EXPO_PUBLIC_LANDING_MM_NEXT_DRAW_ISO');
 
-  const [fromPb, fromMm] = await Promise.all([
-    jackpotForTexasPage(TX_POWERBALL_PAGE, 'powerball.png'),
-    jackpotForTexasPage(TX_MEGA_PAGE, 'mega_millions.png'),
-  ]);
+  const [fromPb, fromMm] =
+    Platform.OS === 'web'
+      ? await fetchEdgeJackpots()
+      : await Promise.all([
+          jackpotForTexasPage(TX_POWERBALL_PAGE, 'powerball.png'),
+          jackpotForTexasPage(TX_MEGA_PAGE, 'mega_millions.png'),
+        ]);
 
   return {
     powerball: fromPb ?? pbEnv,
