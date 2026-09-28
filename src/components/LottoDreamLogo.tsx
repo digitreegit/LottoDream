@@ -4,6 +4,8 @@ import { SvgXml } from 'react-native-svg';
 interface LottoDreamLogoProps {
   width?: number;
   height?: number;
+  /** 'onDark' renders the wordmark white for dark backgrounds. */
+  tone?: 'default' | 'onDark';
 }
 
 /** viewBox from assets/logo-lotto-dream.svg; fills inlined for SvgXml */
@@ -27,7 +29,11 @@ const logoSvg = `<?xml version="1.0" encoding="UTF-8"?>
   </g>
 </svg>`;
 
-export function LottoDreamLogo({ width = 320, height }: LottoDreamLogoProps) {
+const logoSvgOnDark = logoSvg
+  .replace(/#010101/g, '#FFFFFF')
+  .replace('fill="#148c74"', 'fill="#1FD3A8"');
+
+export function LottoDreamLogo({ width = 320, height, tone = 'default' }: LottoDreamLogoProps) {
   const h = height ?? (width * VIEWBOX_H) / VIEWBOX_W;
-  return <SvgXml xml={logoSvg} width={width} height={h} />;
+  return <SvgXml xml={tone === 'onDark' ? logoSvgOnDark : logoSvg} width={width} height={h} />;
 }

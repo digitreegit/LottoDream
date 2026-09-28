@@ -1,13 +1,16 @@
 // ============================================
-// Web Landing Page – marketing-style website
+// Web Landing Page – marketing-style website ("draw night" dark theme)
 // ============================================
+// Layout lives in React Native styles. Web-only polish (gradients, glow,
+// glossy balls, entrance animations, hover lift) comes from one scoped
+// stylesheet keyed by `data-ld` attributes — see LANDING_CSS below.
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   Image,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   useWindowDimensions,
   Platform,
@@ -16,9 +19,14 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LottoDreamLogo } from '../components/LottoDreamLogo';
 import { fetchLandingGameJackpots, type LandingJackpotDisplay } from '../services/jackpotDisplayService';
-import { landingCtaPrimaryButton, landingCtaPrimaryButtonText } from '../theme/landingCta';
-import { WEB_CONTENT_MAX_WIDTH } from '../theme/webDashboard';
-import { PREMIUM_PRICE_DISPLAY, PREMIUM_PRICE_PERIOD, PREMIUM_TRIAL_DAYS } from '../config/constants';
+import {
+  PREMIUM_PRICE_DISPLAY,
+  PREMIUM_PRICE_PERIOD,
+  PREMIUM_TRIAL_DAYS,
+  PREMIUM_YEARLY_PRICE_DISPLAY,
+  PREMIUM_YEARLY_PRICE_PERIOD,
+  PREMIUM_YEARLY_SAVINGS_PCT,
+} from '../config/constants';
 
 interface Props {
   onLogin: () => void;
@@ -45,9 +53,8 @@ const FEATURE_SECURE_PATH =
   'M9.19,13.33l2.66,2.23,4.65-4.96M12.6,3.27c-2.26,2.15-5.28,3.33-8.4,3.29-.4,1.21-.6,2.48-.6,3.75,0,5.59,3.82,10.29,9,11.62,5.18-1.33,9-6.03,9-11.62,0-1.31-.21-2.57-.6-3.75h-.15c-3.2,0-6.1-1.25-8.25-3.28h0Z';
 
 const FEATURE_ICON_VIEWBOX = '0 0 25.2 25.2';
-
-const FEATURE_ICON_SIZE = 32.4;
-const STICKY_NAV_OFFSET = 88;
+/** Nav height (~67px); bands start with 80px padding so the heading clears it. */
+const STICKY_NAV_OFFSET = 16;
 const POWERBALL_LOGO = require('../../assets/powerball-logo.png');
 const MEGA_MILLIONS_LOGO = require('../../assets/mega-millions-logo.png');
 const APP_STORE_BADGE = require('../../assets/badge-appstore.png');
@@ -58,13 +65,34 @@ const POWERBALL_DRAW_DAYS = [1, 3, 6];
 /** Tue, Fri */
 const MEGA_DRAW_DAYS = [2, 5];
 
+const C = {
+  ink: '#060913',
+  ink2: '#0A1020',
+  surface: 'rgba(255,255,255,0.035)',
+  surfaceHi: 'rgba(255,255,255,0.06)',
+  border: 'rgba(255,255,255,0.09)',
+  text: '#F4F6FB',
+  muted: '#9AA4B8',
+  faint: '#667085',
+  teal: '#1FD3A8',
+  tealDeep: '#00A383',
+  gold: '#FFC857',
+  red: '#FF4D5E',
+  blue: '#4C8DFF',
+};
+
+const PICK_MODES = ['Balanced', 'Hot', 'Cold', 'Anti-Crowd', 'Lucky Dates'] as const;
+const PICK_CYCLE_MS = 3200;
+
+type SectionKey = 'features' | 'jackpots' | 'howItWorks' | 'pricing';
+
+/** Attach a landing-stylesheet hook (web only; ignored on native). */
+function ld(name: string): object {
+  return Platform.OS === 'web' ? ({ dataSet: { ld: name } } as object) : {};
+}
+
 function formatWeekdayShortDate(d: Date): string {
-  return d.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function nextScheduledDrawOnOrAfter(from: Date, weekdays: number[]): Date {
@@ -78,19 +106,70 @@ function nextScheduledDrawOnOrAfter(from: Date, weekdays: number[]): Date {
   return start;
 }
 
+function randomPowerballPick(): { whites: number[]; power: number } {
+  const set = new Set<number>();
+  while (set.size < 5) set.add(1 + Math.floor(Math.random() * 69));
+  return {
+    whites: [...set].sort((a, b) => a - b),
+    power: 1 + Math.floor(Math.random() * 26),
+  };
+}
+
+/** Display-only pattern score: how close the pick sits to typical sum / odd-even balance. */
+function patternScore(whites: number[]): number {
+  const sum = whites.reduce((a, b) => a + b, 0);
+  const odd = whites.filter((n) => n % 2).length;
+  const sumPenalty = Math.min(Math.abs(sum - 175) / 3, 30);
+  const balancePenalty = Math.abs(odd - 2.5) * 6;
+  return Math.round(Math.max(55, 99 - sumPenalty - balancePenalty));
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+/** Inject the landing stylesheet once (web). */
+function useLandingStyles() {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    if (document.getElementById('ld-landing-css')) return;
+    const el = document.createElement('style');
+    el.id = 'ld-landing-css';
+    el.textContent = LANDING_CSS;
+    document.head.appendChild(el);
+  }, []);
+}
+
 export function WebLandingPage({ onLogin, onRegister }: Props) {
+  useLandingStyles();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const isWide = width >= 768;
-  
+  const isWide = width >= 900;
+  const isMid = width >= 640;
+
   const scrollViewRef = useRef<ScrollView>(null);
-  const [sectionY, setSectionY] = useState({ features: 0, howItWorks: 0, supportedGames: 0 });
-  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [sectionY, setSectionY] = useState<Record<SectionKey, number>>({
+    features: 0,
+    jackpots: 0,
+    howItWorks: 0,
+    pricing: 0,
+  });
+  const sectionRefs = useRef<Partial<Record<SectionKey, View | null>>>({});
   const [menuOpen, setMenuOpen] = useState(false);
   const [landingJackpots, setLandingJackpots] = useState<{
     powerball: LandingJackpotDisplay | null;
     megamillions: LandingJackpotDisplay | null;
   }>({ powerball: null, megamillions: null });
+
+  const [round, setRound] = useState(0);
+  const [pick, setPick] = useState(() => ({
+    whites: [7, 19, 33, 48, 62],
+    power: 11,
+  }));
 
   useEffect(() => {
     let cancelled = false;
@@ -107,15 +186,52 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
     };
   }, []);
 
-  const scrollToSection = (sectionKey: 'features' | 'howItWorks' | 'supportedGames') => {
-    const yOffset = Math.max(sectionY[sectionKey] - STICKY_NAV_OFFSET, 0);
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({
-        y: yOffset,
-        animated: true,
-      });
+  // Hero demo: draw a fresh pick every few seconds.
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const id = setInterval(() => {
+      setPick(randomPowerballPick());
+      setRound((r) => r + 1);
+    }, PICK_CYCLE_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const trackSection = (key: SectionKey) => ({
+    ref: (node: View | null) => {
+      sectionRefs.current[key] = node;
+    },
+    onLayout: (event: { nativeEvent: { layout: { y: number } } }) => {
+      const y = event.nativeEvent.layout.y;
+      setSectionY((prev) => (prev[key] === y ? prev : { ...prev, [key]: y }));
+    },
+  });
+
+  const scrollToSection = (key: SectionKey) => {
+    setMenuOpen(false);
+    let y = sectionY[key];
+    // On web, onLayout offsets are skewed by the sticky-header wrapper, so
+    // measure the band's real position inside the scroll container instead.
+    const node = sectionRefs.current[key] as unknown as HTMLElement | null;
+    const scroller = (scrollViewRef.current as any)?.getScrollableNode?.() as HTMLElement | undefined;
+    if (Platform.OS === 'web' && node?.getBoundingClientRect && scroller) {
+      y = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
     }
+    scrollViewRef.current?.scrollTo({ y: Math.max(y - STICKY_NAV_OFFSET, 0), animated: true });
   };
+
+  const mode = PICK_MODES[round % PICK_MODES.length];
+  const score = patternScore(pick.whites);
+  const sum = pick.whites.reduce((a, b) => a + b, 0);
+  const odd = pick.whites.filter((n) => n % 2).length;
+  const pbJackpot = landingJackpots.powerball?.amountDisplay;
+  const gutter = isWide ? 40 : 16;
+
+  const navLinks: { key: SectionKey; label: string }[] = [
+    { key: 'features', label: 'Features' },
+    { key: 'jackpots', label: 'Jackpots' },
+    { key: 'howItWorks', label: 'How it works' },
+    { key: 'pricing', label: 'Pricing' },
+  ];
 
   return (
     <ScrollView
@@ -124,973 +240,928 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       ref={scrollViewRef}
       stickyHeaderIndices={[0]}
     >
-      {/* ── Navbar: full-width white band; logo & links capped at 1280 like main column ── */}
+      {/* ── Nav ── */}
       <View style={styles.navShell}>
-        <View style={styles.navBand}>
-          <View style={styles.navInner}>
-            <View style={[styles.nav, isWide && styles.navWide, { paddingTop: 20 + insets.top }]}>
-              <View style={styles.navLogoWrap}>
-                <LottoDreamLogo width={200} />
+        <View style={styles.navBand} {...ld('nav')}>
+          <View style={[styles.container, styles.nav, { paddingHorizontal: gutter, paddingTop: 14 + insets.top }]}>
+            <LottoDreamLogo width={isMid ? 168 : 140} tone="onDark" />
+            {isWide ? (
+              <View style={styles.navLinks}>
+                {navLinks.map((l) => (
+                  <Pressable key={l.key} onPress={() => scrollToSection(l.key)} {...ld('navlink')}>
+                    <Text style={styles.navLink}>{l.label}</Text>
+                  </Pressable>
+                ))}
+                <Pressable onPress={onLogin} style={styles.navGhost} {...ld('btn-ghost')}>
+                  <Text style={styles.navGhostText}>Sign in</Text>
+                </Pressable>
+                <Pressable onPress={onRegister} style={styles.navPrimary} {...ld('btn-primary')}>
+                  <Text style={styles.navPrimaryText}>Start free</Text>
+                </Pressable>
               </View>
-              {isWide ? (
-                <View style={styles.navLinks}>
-                  <TouchableOpacity onPress={() => scrollToSection('features')}>
-                    <Text style={styles.navLink}>Features</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => scrollToSection('howItWorks')}>
-                    <Text style={styles.navLink}>How It Works</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => scrollToSection('supportedGames')}>
-                    <Text style={styles.navLink}>Supported Games</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.navLoginBtn, { backgroundColor: hoveredButton === 'navSignIn' ? 'rgba(113, 128, 150, 0.15)' : 'rgba(113, 128, 150, 0.08)' }]}
-                    {...({ onMouseEnter: () => setHoveredButton('navSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
-                    onPress={onLogin}
-                  >
-                    <Text style={styles.navLoginText}>Sign In</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.hamburger} onPress={() => setMenuOpen(v => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <View style={[styles.hamburgerBar, styles.hamburgerBarTop, menuOpen && styles.hamburgerBarTopOpen]} />
-                  <View style={[styles.hamburgerBar, styles.hamburgerBarMid, menuOpen && styles.hamburgerBarMidOpen]} />
-                  <View style={[styles.hamburgerBar, styles.hamburgerBarBot, menuOpen && styles.hamburgerBarBotOpen]} />
-                </TouchableOpacity>
-              )}
-            </View>
+            ) : (
+              <Pressable
+                style={styles.hamburger}
+                onPress={() => setMenuOpen((v) => !v)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={menuOpen ? 'Close menu' : 'Open menu'}
+              >
+                <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: 6 }, { rotate: '45deg' }] }]} />
+                <View style={[styles.hamburgerBar, menuOpen && { opacity: 0 }]} />
+                <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: -6 }, { rotate: '-45deg' }] }]} />
+              </Pressable>
+            )}
           </View>
         </View>
-        {/* ── Mobile Drawer Overlay ── */}
         {!isWide && menuOpen && (
           <View style={styles.mobileOverlay}>
-            <TouchableOpacity
-              style={[styles.mobileOverlayBackdrop, { height }]}
-              activeOpacity={1}
-              onPress={() => setMenuOpen(false)}
-            />
+            <Pressable style={[styles.mobileBackdrop, { height }]} onPress={() => setMenuOpen(false)} />
             <View style={styles.mobileDrawer}>
-              <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('features'); setMenuOpen(false); }}>
-                <Text style={styles.mobileDrawerText}>Features</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('howItWorks'); setMenuOpen(false); }}>
-                <Text style={styles.mobileDrawerText}>How It Works</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.mobileDrawerItem} onPress={() => { scrollToSection('supportedGames'); setMenuOpen(false); }}>
-                <Text style={styles.mobileDrawerText}>Supported Games</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.88}
-                style={[
-                  styles.ctaPrimary,
-                  styles.ctaPrimaryWide,
-                  { marginTop: 12 },
-                  Platform.OS === 'web' && styles.ctaPrimaryWeb,
-                  { backgroundColor: hoveredButton === 'mobileSignIn' ? '#00B896' : '#00A383' },
-                ]}
-                onPress={() => { onLogin(); setMenuOpen(false); }}
-                {...({ onMouseEnter: () => setHoveredButton('mobileSignIn'), onMouseLeave: () => setHoveredButton(null) } as any)}
-              >
-                <Text style={styles.ctaPrimaryText}>Sign In</Text>
-              </TouchableOpacity>
+              {navLinks.map((l) => (
+                <Pressable key={l.key} style={styles.mobileDrawerItem} onPress={() => scrollToSection(l.key)}>
+                  <Text style={styles.mobileDrawerText}>{l.label}</Text>
+                </Pressable>
+              ))}
+              <View style={styles.mobileDrawerCtas}>
+                <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => { setMenuOpen(false); onLogin(); }} {...ld('btn-ghost')}>
+                  <Text style={styles.btnGhostText}>Sign in</Text>
+                </Pressable>
+                <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => { setMenuOpen(false); onRegister(); }} {...ld('btn-primary')}>
+                  <Text style={styles.btnPrimaryText}>Start free trial</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         )}
       </View>
 
       {/* ── Hero ── */}
-      <View style={[styles.hero, isWide && styles.heroWide]}>
-        <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]}>
-          Smarter Lottery Picks{`\n`}
-          <Text style={styles.heroTitleAccent}>Powered by AI</Text>
-        </Text>
-        <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
-          Pick numbers the fun way across 6 games — Powerball, Mega Millions, Cash4Life,
-          Take 5, NY Lotto & Pick 10. AI strategies, Today's Fortune lucky numbers, and
-          win-quality visualizations. Try Premium free for {PREMIUM_TRIAL_DAYS} days.
-        </Text>
-        <View style={[styles.heroCtas, isWide && styles.heroCtasWide]}>
-          <TouchableOpacity
-            activeOpacity={0.88}
-            style={[
-              styles.ctaPrimary,
-              styles.ctaPrimaryWide,
-              Platform.OS === 'web' && styles.ctaPrimaryWeb,
-              { backgroundColor: hoveredButton === 'getStarted' ? '#00B896' : '#00A383' },
-            ]}
-            onPress={onRegister}
-            {...({ onMouseEnter: () => setHoveredButton('getStarted'), onMouseLeave: () => setHoveredButton(null) } as any)}
-          >
-            <Text style={styles.ctaPrimaryText}>Get Started</Text>
-          </TouchableOpacity>
+      <View style={styles.heroBand} {...ld('hero')}>
+        <View {...ld('orb-a')} style={styles.orbA} />
+        <View {...ld('orb-b')} style={styles.orbB} />
+        <View style={[styles.container, styles.hero, isWide && styles.heroWide, { paddingHorizontal: gutter }]}>
+          <View style={[styles.heroCopy, isWide && styles.heroCopyWide]}>
+            <View style={styles.livePill}>
+              <View style={styles.liveDot} {...ld('live-dot')} />
+              <Text style={styles.livePillText}>
+                {pbJackpot ? (
+                  <>
+                    Powerball jackpot now <Text style={styles.livePillStrong}>{pbJackpot}</Text>
+                  </>
+                ) : (
+                  '6 games · updated after every draw'
+                )}
+              </Text>
+            </View>
+
+            <Text style={[styles.heroTitle, isMid && styles.heroTitleMid, isWide && styles.heroTitleWide]} accessibilityRole="header">
+              Play your numbers{'\n'}
+              <Text style={styles.heroTitleAccent} {...ld('grad-text')}>like you mean it.</Text>
+            </Text>
+
+            <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
+              AI pick strategies, live jackpots, and a daily lucky-number reading for Powerball,
+              Mega Millions, Cash4Life, Take 5, NY Lotto & Pick 10 — all in one place.
+            </Text>
+
+            <View style={[styles.heroCtas, isMid && styles.heroCtasRow]}>
+              <Pressable style={[styles.btn, styles.btnPrimary, styles.btnLg]} onPress={onRegister} {...ld('btn-primary')}>
+                <Text style={[styles.btnPrimaryText, styles.btnLgText]}>
+                  Start {PREMIUM_TRIAL_DAYS}-day free trial
+                </Text>
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnGhost, styles.btnLg]} onPress={onLogin} {...ld('btn-ghost')}>
+                <Text style={[styles.btnGhostText, styles.btnLgText]}>Sign in</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.trustRow}>
+              {['Free plan forever', 'Cancel anytime', 'Web · iOS · Android'].map((t) => (
+                <View key={t} style={styles.trustItem}>
+                  <CheckIcon color={C.teal} size={14} />
+                  <Text style={styles.trustText}>{t}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Live pick card */}
+          <View style={[styles.pickWrap, isWide && styles.pickWrapWide]}>
+            <View style={styles.pickCard} {...ld('pick-card')}>
+              <View style={styles.pickHeader}>
+                <View>
+                  <Text style={styles.pickEyebrow}>POWERBALL · AI PICK</Text>
+                  <Text style={styles.pickMode}>{mode} mode</Text>
+                </View>
+                <View style={styles.pickChip}>
+                  <Text style={styles.pickChipText}>#{String(round + 1).padStart(3, '0')}</Text>
+                </View>
+              </View>
+
+              <View style={styles.ballRow}>
+                {pick.whites.map((n, i) => (
+                  <Ball key={`${round}-${i}`} n={n} kind="white" size={isMid ? 54 : 44} delay={i * 90} />
+                ))}
+                <Ball key={`${round}-pb`} n={pick.power} kind="red" size={isMid ? 54 : 44} delay={5 * 90} />
+              </View>
+
+              <View style={styles.pickStats}>
+                <View style={styles.pickStatWide}>
+                  <View style={styles.pickStatHead}>
+                    <Text style={styles.pickStatLabel}>Pattern score</Text>
+                    <Text style={styles.pickStatValue}>{score}</Text>
+                  </View>
+                  <View style={styles.meterTrack}>
+                    <View style={[styles.meterFill, { width: `${score}%` as any }]} {...ld('meter')} />
+                  </View>
+                </View>
+                <View style={styles.pickStat}>
+                  <Text style={styles.pickStatLabel}>Sum</Text>
+                  <Text style={styles.pickStatValue}>{sum}</Text>
+                </View>
+                <View style={styles.pickStat}>
+                  <Text style={styles.pickStatLabel}>Odd / Even</Text>
+                  <Text style={styles.pickStatValue}>
+                    {odd} / {5 - odd}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.modeRow}>
+                {PICK_MODES.map((m) => (
+                  <View key={m} style={[styles.modeChip, m === mode && styles.modeChipActive]}>
+                    <Text style={[styles.modeChipText, m === mode && styles.modeChipTextActive]}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <Text style={styles.pickFoot}>
+                The odds never change — the way you pick can be a lot more fun.
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
-      {/* ── Feature Cards ── */}
-      <View 
-        style={[styles.section, styles.featuresSection, isWide && styles.sectionWide]}
-        onLayout={(event) => {
-          setSectionY((prev) => ({
-            ...prev,
-            features: event.nativeEvent.layout.y,
-          }));
-        }}
-      >
-        <Text style={styles.sectionTitle}>Dashboard powered Lottery Tools</Text>
-        <Text style={styles.sectionSub}>
-        Track numbers, generate combinations, and turn lucky dates into personalized picks.
-        </Text>
+      {/* ── Jackpots ── */}
+      <View style={styles.band} {...trackSection('jackpots')}>
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          <SectionHead
+            eyebrow="Live jackpots"
+            title="What's on the line this week"
+            sub="Estimated annuitized jackpots, refreshed throughout the day."
+          />
+          <View style={[styles.jackpotRow, isMid && styles.rowWrap]}>
+            <JackpotCard
+              kind="powerball"
+              logo={POWERBALL_LOGO}
+              logoStyle={styles.logoPowerball}
+              name="Powerball"
+              amount={landingJackpots.powerball?.amountDisplay}
+              nextDraw={
+                landingJackpots.powerball?.nextDrawDate ??
+                nextScheduledDrawOnOrAfter(new Date(), POWERBALL_DRAW_DAYS)
+              }
+              rules="5 of 1–69 + Powerball 1–26 · Mon, Wed, Sat"
+              wide={isMid}
+            />
+            <JackpotCard
+              kind="mega"
+              logo={MEGA_MILLIONS_LOGO}
+              logoStyle={styles.logoMega}
+              name="Mega Millions"
+              amount={landingJackpots.megamillions?.amountDisplay}
+              nextDraw={
+                landingJackpots.megamillions?.nextDrawDate ??
+                nextScheduledDrawOnOrAfter(new Date(), MEGA_DRAW_DAYS)
+              }
+              rules="5 of 1–70 + Mega Ball 1–25 · Tue, Fri"
+              wide={isMid}
+            />
+          </View>
+        </View>
+      </View>
 
-          <View style={[styles.featureGrid, isWide && styles.featureGridWide]}>
+      {/* ── Features (bento) ── */}
+      <View style={styles.band} {...trackSection('features')}>
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          <SectionHead
+            eyebrow="Features"
+            title="Everything between a hunch and a ticket"
+            sub="Explore the numbers, pick a strategy, and keep your favorite sets on every device."
+          />
+          <View style={[styles.bento, isMid && styles.rowWrap]}>
             {FEATURES.map((f, i) => (
-              <View key={i} style={[styles.featureCard, isWide && styles.featureCardWide]}>
-                <View style={styles.featureSvgWrap}>
-                  <Svg width={FEATURE_ICON_SIZE} height={FEATURE_ICON_SIZE} viewBox={FEATURE_ICON_VIEWBOX}>
-                    <Path
-                      d={f.svgPath}
-                      fill="none"
-                      stroke="#148c74"
-                      strokeWidth={1.5}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+              <View
+                key={f.title}
+                style={[
+                  styles.featureCard,
+                  isWide && (f.span === 2 ? styles.span2 : f.span === 3 ? styles.span3 : styles.span1),
+                  !isWide && isMid && (f.span === 1 ? styles.half : styles.full),
+                ]}
+                {...ld('card')}
+              >
+                <View style={[styles.featureIcon, { backgroundColor: f.tint }]} {...ld(`icon-${i % 3}`)}>
+                  <Svg width={26} height={26} viewBox={FEATURE_ICON_VIEWBOX}>
+                    <Path d={f.svgPath} fill="none" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
                   </Svg>
                 </View>
-                <Text style={styles.featureTitle}>{f.title}</Text>
-                <Text style={styles.featureDesc}>{f.desc}</Text>
-              </View>
-            ))}
-          </View>
-      </View>
-
-      {/* ── How It Works (full-bleed gray band on web) ── */}
-      <View
-        style={styles.howItWorksBand}
-        onLayout={(event) => {
-          setSectionY((prev) => ({
-            ...prev,
-            howItWorks: event.nativeEvent.layout.y,
-          }));
-        }}
-      >
-        <View style={[styles.section, isWide && styles.sectionWide]}>
-          <Text style={[styles.sectionTitle]}>How It Works</Text>
-          <Text style={[styles.sectionSub, styles.howItWorksSub]}>
-            Four steps from sign up to your first personalized number set.
-          </Text>
-
-          <View style={[styles.stepsRow, isWide && styles.stepsRowWide]}>
-            {STEPS.map((s, i) => (
-              <View key={i} style={[styles.stepCard, isWide && styles.stepCardWide]}>
-                <View style={[styles.stepBadgeRow, isWide && styles.stepBadgeRowWide]}>
-                  {isWide && <View style={[styles.stepHLine, i === 0 && styles.stepHLineHidden]} />}
-                  <View style={styles.stepBadge}>
-                    <Text style={styles.stepNum}>{i + 1}</Text>
+                <View style={f.span > 1 && isWide ? styles.featureBodyRow : undefined}>
+                  <View style={f.span > 1 && isWide ? styles.featureTextCol : undefined}>
+                    <Text style={styles.featureTitle}>{f.title}</Text>
+                    <Text style={styles.featureDesc}>{f.desc}</Text>
                   </View>
-                  {isWide && <View style={[styles.stepHLine, i === STEPS.length - 1 && styles.stepHLineHidden]} />}
+                  {f.title === 'Real-time analytics' ? <HotNumbersChart /> : null}
                 </View>
-                <Text style={[styles.stepTitle, isWide && styles.stepTitleWide]}>{s.title}</Text>
-                <Text style={[styles.stepDesc, isWide && styles.stepDescWide]}>{s.desc}</Text>
               </View>
             ))}
           </View>
         </View>
       </View>
 
-      {/* ── Games ── */}
-      <View
-        style={[styles.section, isWide && styles.sectionWide, styles.supportedGamesSection]}
-        onLayout={(event) => {
-          setSectionY((prev) => ({
-            ...prev,
-            supportedGames: event.nativeEvent.layout.y,
-          }));
-        }}
-      >
-        <Text style={[styles.sectionTitle]}>Supported Games</Text>
-        <View style={[styles.gamesRow, isWide && styles.gamesRowWide]}>
-          <View style={[styles.gameCard, isWide && styles.gameCardWide]}>
-            <Image source={POWERBALL_LOGO} style={styles.gameLogoPowerball} />
-            <Text style={styles.gameResultPrimary}>
-              {landingJackpots.powerball?.amountDisplay ?? '—'}
-            </Text>
-            <Text style={styles.gameResultMeta}>
-              Next drawing:{' '}
-              {formatWeekdayShortDate(
-                landingJackpots.powerball?.nextDrawDate ??
-                  nextScheduledDrawOnOrAfter(new Date(), POWERBALL_DRAW_DAYS)
-              )}
-            </Text>
-            <Text style={styles.gameTitle}>Powerball</Text>
-            <Text style={styles.gameDesc}>
-              5 white balls (1-69) + 1 Powerball (1-26){'\n'}
-              Draws: Mon, Wed, Sat
-            </Text>
-          </View>
-          <View style={[styles.gameCard, isWide && styles.gameCardWide]}>
-            <Image source={MEGA_MILLIONS_LOGO} style={styles.gameLogoMegaMillions} />
-            <Text style={styles.gameResultPrimary}>
-              {landingJackpots.megamillions?.amountDisplay ?? '—'}
-            </Text>
-            <Text style={styles.gameResultMeta}>
-              Next drawing:{' '}
-              {formatWeekdayShortDate(
-                landingJackpots.megamillions?.nextDrawDate ??
-                  nextScheduledDrawOnOrAfter(new Date(), MEGA_DRAW_DAYS)
-              )}
-            </Text>
-            <Text style={styles.gameTitle}>Mega Millions</Text>
-            <Text style={styles.gameDesc}>
-              5 white balls (1-70) + 1 Mega Ball (1-25){'\n'}
-              Draws: Tue, Fri
-            </Text>
+      {/* ── How it works ── */}
+      <View style={[styles.band, styles.bandAlt]} {...trackSection('howItWorks')}>
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          <SectionHead eyebrow="How it works" title="From sign-up to your first set in minutes" />
+          <View style={[styles.steps, isWide && styles.stepsWide]}>
+            {STEPS.map((s, i) => (
+              <View key={s.title} style={[styles.step, isWide && styles.stepWide]}>
+                <Text style={styles.stepNum} {...ld('step-num')}>
+                  {String(i + 1).padStart(2, '0')}
+                </Text>
+                <Text style={styles.stepTitle}>{s.title}</Text>
+                <Text style={styles.stepDesc}>{s.desc}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>
 
-      {/* ── Pricing teaser ── */}
-      <View style={[styles.pricingBand, isWide && styles.pricingBandWide]}>
-        <Text style={styles.pricingEyebrow}>PRICING</Text>
-        <Text style={[styles.pricingHeading, isWide && styles.pricingHeadingWide]}>
-          {PREMIUM_TRIAL_DAYS} days free, then {PREMIUM_PRICE_DISPLAY}/month
-        </Text>
-        <Text style={styles.pricingSub}>
-          Pure Random stays free forever. Start a {PREMIUM_TRIAL_DAYS}-day free trial to unlock
-          all AI modes, Today's Fortune lucky numbers & win-quality visualizations — then{' '}
-          {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}. Cancel anytime.
-        </Text>
-
-        <View
-          style={[styles.pricingPlansRow, isWide && styles.pricingPlansRowWide]}
-        >
-          <View style={styles.pricingCard}>
-            <Text style={styles.pricingCardTier}>Free</Text>
-            <Text style={styles.pricingCardPrice}>$0</Text>
-            <Text style={styles.pricingCardLine}>• Pure Random picks</Text>
-            <Text style={styles.pricingCardLine}>• Live jackpots & results</Text>
-            <Text style={styles.pricingCardLine}>• Save up to 20 tickets</Text>
-          </View>
-          <View style={[styles.pricingCard, styles.pricingCardPro]}>
-            <View style={styles.pricingBadge}>
-              <Text style={styles.pricingBadgeText}>BEST VALUE</Text>
+      {/* ── Pricing ── */}
+      <View style={styles.band} {...trackSection('pricing')}>
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          <SectionHead
+            eyebrow="Pricing"
+            title={`${PREMIUM_TRIAL_DAYS} days free. Then less than a ticket a week.`}
+            sub="Pure Random stays free forever. Premium unlocks every strategy and all six games."
+          />
+          <View style={[styles.pricingRow, isMid && styles.rowWrap]}>
+            <View style={[styles.planCard, isMid && styles.planHalf]} {...ld('card')}>
+              <Text style={styles.planTier}>Free</Text>
+              <View style={styles.planPriceRow}>
+                <Text style={styles.planPrice}>$0</Text>
+                <Text style={styles.planPer}>forever</Text>
+              </View>
+              <Text style={styles.planNote}>Everything you need to explore.</Text>
+              <View style={styles.planList}>
+                {['Pure Random picks', 'Live jackpots & draw results', 'Full draw history', 'Save up to 3 sets'].map((t) => (
+                  <PlanLine key={t} text={t} />
+                ))}
+              </View>
+              <Pressable style={[styles.btn, styles.btnGhost, styles.planBtn]} onPress={onRegister} {...ld('btn-ghost')}>
+                <Text style={styles.btnGhostText}>Create free account</Text>
+              </Pressable>
             </View>
-            <Text style={[styles.pricingCardTier, styles.pricingCardTierPro]}>
-              Premium
-            </Text>
-            <Text style={[styles.pricingCardPrice, styles.pricingCardPricePro]}>
-              {PREMIUM_PRICE_DISPLAY}
-              <Text style={styles.pricingCardPriceNote}> {PREMIUM_PRICE_PERIOD} · {PREMIUM_TRIAL_DAYS}-day trial</Text>
-            </Text>
-            <Text style={styles.pricingCardLine}>• All 5 AI prediction modes</Text>
-            <Text style={styles.pricingCardLine}>• Today's Fortune lucky numbers</Text>
-            <Text style={styles.pricingCardLine}>• Win-quality visualizations</Text>
-            <Text style={styles.pricingCardLine}>• All 6 games & unlimited saves</Text>
-            <Text style={styles.pricingCardLine}>• Priority support</Text>
+
+            <View style={[styles.planProOuter, isMid && styles.planHalf]} {...ld('pro-border')}>
+              <View style={[styles.planCard, styles.planPro]}>
+                <View style={styles.planBadge} {...ld('badge')}>
+                  <Text style={styles.planBadgeText}>{PREMIUM_TRIAL_DAYS} DAYS FREE</Text>
+                </View>
+                <Text style={[styles.planTier, { color: C.gold }]}>Premium</Text>
+                <View style={styles.planPriceRow}>
+                  <Text style={styles.planPrice}>{PREMIUM_PRICE_DISPLAY}</Text>
+                  <Text style={styles.planPer}>{PREMIUM_PRICE_PERIOD.replace('/', 'per ')}</Text>
+                </View>
+                <Text style={styles.planNote}>
+                  or {PREMIUM_YEARLY_PRICE_DISPLAY}
+                  {PREMIUM_YEARLY_PRICE_PERIOD} —{' '}
+                  <Text style={{ color: C.teal, fontWeight: '700' }}>save {PREMIUM_YEARLY_SAVINGS_PCT}%</Text>
+                </Text>
+                <View style={styles.planList}>
+                  {[
+                    '5 AI pick strategies',
+                    "Today's Fortune lucky numbers",
+                    'Pattern scores & backtests',
+                    'All 6 games, unlimited saves',
+                    'Priority support',
+                  ].map((t) => (
+                    <PlanLine key={t} text={t} accent />
+                  ))}
+                </View>
+                <Pressable style={[styles.btn, styles.btnPrimary, styles.planBtn]} onPress={onRegister} {...ld('btn-primary')}>
+                  <Text style={styles.btnPrimaryText}>Start free trial</Text>
+                </Pressable>
+                <Text style={styles.planFine}>Card required · cancel anytime before day {PREMIUM_TRIAL_DAYS}</Text>
+              </View>
+            </View>
           </View>
         </View>
       </View>
 
-      {/* ── CTA Banner ── */}
-      <View style={[styles.ctaBanner, isWide && styles.ctaBannerWide]}>
-        <Text style={[styles.ctaBannerTitle, isWide && styles.ctaBannerTitleWide]}>
-          Ready to Play Smarter?
-        </Text>
-        <Text style={styles.ctaBannerSub}>
-          Sign up now to save your picks, track results, and play with your own lucky number combos — on any device.
-        </Text>
-        <TouchableOpacity
-          activeOpacity={0.88}
-          style={[
-            styles.ctaPrimary,
-            styles.ctaPrimaryWide,
-            Platform.OS === 'web' && styles.ctaPrimaryWeb,
-            { backgroundColor: hoveredButton === 'ctaBanner' ? '#00B896' : '#00A383' },
-          ]}
-          onPress={onRegister}
-          {...({ onMouseEnter: () => setHoveredButton('ctaBanner'), onMouseLeave: () => setHoveredButton(null) } as any)}
-        >
-          <Text style={styles.ctaPrimaryText}>Get Started</Text>
-        </TouchableOpacity>
+      {/* ── Final CTA ── */}
+      <View style={styles.band}>
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          <View style={[styles.finalCta, isWide && styles.finalCtaWide]} {...ld('final-cta')}>
+            <View style={[styles.finalBalls, { pointerEvents: 'none' }]}>
+              <Ball n={7} kind="white" size={isMid ? 64 : 46} float={0} />
+              <Ball n={21} kind="gold" size={isMid ? 52 : 38} float={1} />
+              <Ball n={26} kind="red" size={isMid ? 58 : 42} float={2} />
+            </View>
+            <Text style={[styles.finalTitle, isMid && styles.finalTitleMid]}>Your lucky numbers are waiting.</Text>
+            <Text style={styles.finalSub}>
+              Save your picks, track every draw, and play your own way — on the web and on your phone.
+            </Text>
+            <Pressable style={[styles.btn, styles.btnDark, styles.btnLg]} onPress={onRegister} {...ld('btn-dark')}>
+              <Text style={[styles.btnDarkText, styles.btnLgText]}>Get started free</Text>
+            </Pressable>
+            <View style={styles.storeRow}>
+              <View style={styles.storeBadge} accessibilityRole="image" accessibilityLabel="Download on the App Store">
+                <Image source={APP_STORE_BADGE} style={styles.storeImgApple} resizeMode="contain" />
+              </View>
+              <View style={styles.storeBadge} accessibilityRole="image" accessibilityLabel="Get it on Google Play">
+                <Image source={GOOGLE_PLAY_BADGE} style={styles.storeImgGoogle} resizeMode="contain" />
+              </View>
+            </View>
+          </View>
+        </View>
       </View>
 
-      <View style={[styles.storeBadgesRow, isWide && styles.storeBadgesRowWide]}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.storeBadgeHit, Platform.OS === 'web' && styles.storeBadgeHitWeb]}
-          accessibilityRole="link"
-          accessibilityLabel="Download on the App Store"
-        >
-          <Image source={APP_STORE_BADGE} style={styles.storeBadgeImageApp} resizeMode="contain" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.storeBadgeHit, Platform.OS === 'web' && styles.storeBadgeHitWeb]}
-          accessibilityRole="link"
-          accessibilityLabel="Get it on Google Play"
-        >
-          <Image source={GOOGLE_PLAY_BADGE} style={styles.storeBadgeImageGoogle} resizeMode="contain" />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Footer: full-width band & border; content max 1280 ── */}
-      <View style={styles.footerBand}>
-        <View style={styles.footerInner}>
-          <LottoDreamLogo width={150} />
+      {/* ── Footer ── */}
+      <View style={styles.footer}>
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          <LottoDreamLogo width={140} tone="onDark" />
           <Text style={styles.footerDisclaimer}>
-            LottoDream is not affiliated with, endorsed by, or sponsored by the
-            Multi-State Lottery Association, Powerball, or Mega Millions. Lottery games
-            involve random outcomes. No system, including AI-based analysis, can
-            guarantee a winning ticket. Play responsibly. Must be 18+ (or the legal
-            gambling age in your jurisdiction) to play.
+            LottoDream is not affiliated with, endorsed by, or sponsored by the Multi-State Lottery
+            Association, Powerball, or Mega Millions. Lottery games involve random outcomes. No system,
+            including AI-based analysis, can guarantee a winning ticket or change the odds. Play
+            responsibly. Must be 18+ (or the legal gambling age in your jurisdiction) to play.
           </Text>
-          <Text style={styles.footerText}>
-            Data sourced from NY Open Data  •  Updated after every drawing
-          </Text>
-          <Text style={styles.footerText}>
-            © {new Date().getFullYear()} Lotto Dream. All rights reserved.
-          </Text>
+          <Text style={styles.footerText}>Data sourced from NY Open Data · Updated after every drawing</Text>
+          <Text style={styles.footerText}>© {new Date().getFullYear()} Lotto Dream. All rights reserved.</Text>
         </View>
       </View>
     </ScrollView>
   );
 }
 
+/* ── Pieces ── */
+
+function SectionHead({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) {
+  const { width } = useWindowDimensions();
+  return (
+    <View style={styles.sectionHead}>
+      <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text>
+      <Text style={[styles.sectionTitle, width >= 640 && styles.sectionTitleMid]} accessibilityRole="header">
+        {title}
+      </Text>
+      {sub ? <Text style={styles.sectionSub}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+const BALL_FALLBACK = { white: '#E9EDF5', red: C.red, gold: C.gold } as const;
+
+function Ball({
+  n,
+  kind,
+  size,
+  delay,
+  float,
+}: {
+  n: number;
+  kind: 'white' | 'red' | 'gold';
+  size: number;
+  delay?: number;
+  float?: number;
+}) {
+  const webAnim =
+    Platform.OS === 'web'
+      ? ({
+          dataSet: { ld: float != null ? `ball-${kind} float-${float}` : `ball-${kind} pop` },
+          style: { animationDelay: `${delay ?? 0}ms` },
+        } as any)
+      : {};
+  return (
+    <View
+      {...webAnim}
+      style={[
+        styles.ball,
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: BALL_FALLBACK[kind] },
+        webAnim.style,
+      ]}
+    >
+      <Text
+        style={[
+          styles.ballText,
+          { fontSize: size * 0.38, color: kind === 'white' ? '#0B1222' : '#FFFFFF' },
+        ]}
+      >
+        {n}
+      </Text>
+    </View>
+  );
+}
+
+function JackpotCard({
+  kind,
+  logo,
+  logoStyle,
+  name,
+  amount,
+  nextDraw,
+  rules,
+  wide,
+}: {
+  kind: 'powerball' | 'mega';
+  logo: any;
+  logoStyle: object;
+  name: string;
+  amount?: string;
+  nextDraw: Date;
+  rules: string;
+  wide: boolean;
+}) {
+  const [num, unit] = amount ? amount.replace('$', '').split(/\s+/, 2) : ['—', ''];
+  return (
+    <View
+      style={[styles.jackpotCard, wide && styles.planHalf, { borderColor: kind === 'powerball' ? 'rgba(255,77,94,0.35)' : 'rgba(255,200,87,0.35)' }]}
+      {...ld(`jackpot-${kind}`)}
+    >
+      <View style={styles.jackpotTop}>
+        <View style={styles.jackpotLogoChip}>
+          <Image source={logo} style={logoStyle} resizeMode="contain" accessibilityLabel={`${name} logo`} />
+        </View>
+        <View style={styles.nextDrawPill}>
+          <Text style={styles.nextDrawText}>Next draw · {formatWeekdayShortDate(nextDraw)}</Text>
+        </View>
+      </View>
+      <Text style={styles.jackpotLabel}>ESTIMATED JACKPOT</Text>
+      <View style={styles.jackpotAmountRow}>
+        {amount ? <Text style={styles.jackpotDollar}>$</Text> : null}
+        <Text style={styles.jackpotAmount} {...ld(kind === 'powerball' ? 'amount-red' : 'amount-gold')}>
+          {num}
+        </Text>
+        {unit ? <Text style={styles.jackpotUnit}>{unit}</Text> : null}
+      </View>
+      <Text style={styles.jackpotRules}>{rules}</Text>
+    </View>
+  );
+}
+
+const HOT_BARS = [
+  { n: 23, v: 0.92 },
+  { n: 61, v: 0.81 },
+  { n: 32, v: 0.74 },
+  { n: 39, v: 0.66 },
+  { n: 21, v: 0.6 },
+  { n: 10, v: 0.52 },
+  { n: 63, v: 0.47 },
+];
+
+function HotNumbersChart() {
+  return (
+    <View style={styles.chart} accessibilityLabel="Example hot-number frequency chart">
+      {HOT_BARS.map((b, i) => (
+        <View key={b.n} style={styles.chartCol}>
+          <View style={styles.chartTrack}>
+            <View
+              style={[styles.chartBar, { height: `${b.v * 100}%` as any, backgroundColor: i === 0 ? C.gold : C.teal }]}
+              {...ld('bar')}
+            />
+          </View>
+          <Text style={styles.chartLabel}>{b.n}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function CheckIcon({ color, size = 16 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function PlanLine({ text, accent }: { text: string; accent?: boolean }) {
+  return (
+    <View style={styles.planLine}>
+      <CheckIcon color={accent ? C.gold : C.teal} />
+      <Text style={styles.planLineText}>{text}</Text>
+    </View>
+  );
+}
+
 /* ── Static data ── */
 
-const FEATURES = [
+const FEATURES: { title: string; desc: string; svgPath: string; tint: string; span: 1 | 2 | 3 }[] = [
   {
-    title: 'Real-time Analytics',
-    desc: 'See which numbers are trending, which pairs appear most often, and where the odds are shifting.',
+    title: 'Real-time analytics',
+    desc: 'See which numbers are running hot, which pairs show up together, and what is overdue — across years of draws.',
     svgPath: FEATURE_BAR_PATH,
+    tint: C.tealDeep,
+    span: 2,
   },
   {
-    title: 'AI-backed Predictions',
-    desc: 'Six prediction modes by AI: Hot, Cold, Balanced, Anti-Crowd, Random, and Lucky Numbers.',
+    title: 'AI pick strategies',
+    desc: 'Hot, Cold, Balanced, Anti-Crowd and Lucky Dates — or keep it pure random.',
     svgPath: FEATURE_AI_PATH,
+    tint: '#7C5CFF',
+    span: 1,
   },
   {
     title: "Today's Fortune",
-    desc: 'Enter your birthdate for a daily luck reading and matching lucky numbers — never stored, just for you.',
+    desc: 'A daily luck reading from your birthdate with matching numbers. Never stored.',
     svgPath: FEATURE_BOLT_PATH,
+    tint: '#E0A100',
+    span: 1,
   },
   {
-    title: '6 Lottery Games',
-    desc: 'Powerball, Mega Millions, Cash4Life, Take 5, NY Lotto & Pick 10 — pick numbers across all of them.',
+    title: '6 lottery games',
+    desc: 'Powerball, Mega Millions, Cash4Life, Take 5, NY Lotto & Pick 10.',
     svgPath: FEATURE_HISTORY_PATH,
+    tint: '#E5484D',
+    span: 1,
   },
   {
-    title: 'Win-Quality Visuals',
-    desc: 'See each pick’s statistical quality, backtest results, and simulated match likelihood at a glance.',
+    title: 'Pattern scores',
+    desc: 'Every pick gets a pattern score, a backtest against past draws, and a Monte Carlo view.',
     svgPath: FEATURE_PLATFORM_PATH,
+    tint: '#2F6FED',
+    span: 1,
   },
   {
-    title: 'Secure & Private',
-    desc: 'Your data is encrypted and stored securely. We never share your information.',
+    title: 'Private by design',
+    desc: 'Your picks sync securely across web, iPhone and Android. We never sell or share your data.',
     svgPath: FEATURE_SECURE_PATH,
+    tint: '#12805C',
+    span: 3,
   },
 ];
 
 const STEPS = [
-  {
-    title: 'Create Account',
-    desc: 'Register in seconds and get immediate access to the web dashboard and analytics tools.',
-  },
-  {
-    title: 'Analyze Numbers',
-    desc: 'Explore hot/cold trends, draw history, and AI-generated predictions at a glance.',
-  },
-  {
-    title: 'Build Your Picks',
-    desc: 'Use lucky dates, balanced analytics, or AI suggestions to create number combinations.',
-  },
-  {
-    title: 'Save & Play',
-    desc: 'Keep your favorite picks, review live results, and adjust your strategy.',
-  },
+  { title: 'Create an account', desc: 'Sign up in seconds with email or Google — the free plan never expires.' },
+  { title: 'Explore the data', desc: 'Browse hot/cold trends, draw history, and live jackpots for every game.' },
+  { title: 'Build your picks', desc: 'Choose a strategy, add your lucky dates, and generate a set you like.' },
+  { title: 'Save & play', desc: 'Keep favorite sets, check them against each draw, and tweak as you go.' },
 ];
+
+/* ── Web-only stylesheet (hooks via data-ld) ── */
+
+const LANDING_CSS = `
+[data-ld~="nav"] { backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px); background: rgba(6,9,19,0.72) !important; }
+[data-ld~="navlink"] > div { transition: color .15s ease; }
+[data-ld~="navlink"]:hover > div { color: #FFFFFF !important; }
+
+[data-ld~="hero"] { background:
+  radial-gradient(1200px 600px at 85% -10%, rgba(31,211,168,0.16), transparent 60%),
+  radial-gradient(900px 500px at -10% 30%, rgba(124,92,255,0.14), transparent 60%),
+  linear-gradient(180deg, #060913 0%, #0A1020 100%) !important; }
+[data-ld~="orb-a"], [data-ld~="orb-b"] { filter: blur(60px); animation: ld-drift 14s ease-in-out infinite alternate; }
+[data-ld~="orb-a"] { background: radial-gradient(circle, rgba(255,200,87,0.35), transparent 70%) !important; }
+[data-ld~="orb-b"] { background: radial-gradient(circle, rgba(255,77,94,0.25), transparent 70%) !important; animation-duration: 18s; }
+@keyframes ld-drift { from { transform: translate(0,0) scale(1); } to { transform: translate(-40px, 30px) scale(1.15); } }
+
+[data-ld~="grad-text"] { background: linear-gradient(92deg, #1FD3A8 0%, #FFC857 55%, #FF7A59 100%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+[data-ld~="step-num"] { background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.08)); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+[data-ld~="amount-red"] { background: linear-gradient(180deg, #FFFFFF 20%, #FF9AA5 100%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+[data-ld~="amount-gold"] { background: linear-gradient(180deg, #FFFFFF 20%, #FFD98A 100%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+
+[data-ld~="live-dot"] { box-shadow: 0 0 0 0 rgba(31,211,168,0.7); animation: ld-pulse 1.8s ease-out infinite; }
+@keyframes ld-pulse { to { box-shadow: 0 0 0 10px rgba(31,211,168,0); } }
+
+[data-ld~="pick-card"] { background: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02)) !important; box-shadow: 0 40px 80px -30px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.12); backdrop-filter: blur(10px); }
+[data-ld~="meter"] { background: linear-gradient(90deg, #1FD3A8, #FFC857) !important; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+
+[data-ld~="ball-white"] { background: radial-gradient(circle at 32% 28%, #FFFFFF 0%, #EEF1F7 38%, #B7C0D1 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.18), 0 10px 20px -8px rgba(0,0,0,0.6); }
+[data-ld~="ball-red"] { background: radial-gradient(circle at 32% 28%, #FFB3BB 0%, #FF4D5E 42%, #9E1026 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.25), 0 10px 24px -6px rgba(255,77,94,0.55); }
+[data-ld~="ball-gold"] { background: radial-gradient(circle at 32% 28%, #FFF1C7 0%, #FFC857 45%, #B7791F 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.2), 0 10px 24px -6px rgba(255,200,87,0.5); }
+[data-ld~="pop"] { animation: ld-pop .55s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes ld-pop { from { transform: translateY(-18px) scale(.4) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+[data-ld~="float-0"], [data-ld~="float-1"], [data-ld~="float-2"] { animation: ld-float 5s ease-in-out infinite; }
+[data-ld~="float-1"] { animation-delay: -1.6s; animation-duration: 6s; }
+[data-ld~="float-2"] { animation-delay: -3.1s; animation-duration: 5.5s; }
+@keyframes ld-float { 50% { transform: translateY(-10px) rotate(8deg); } }
+
+[data-ld~="card"], [data-ld~="jackpot-powerball"], [data-ld~="jackpot-mega"] { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+[data-ld~="card"]:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.18) !important; box-shadow: 0 24px 50px -24px rgba(0,0,0,0.8); }
+[data-ld~="jackpot-powerball"] { background: radial-gradient(600px 300px at 0% 0%, rgba(255,77,94,0.28), transparent 60%), linear-gradient(160deg, #1A0B12, #0B0B16) !important; }
+[data-ld~="jackpot-mega"] { background: radial-gradient(600px 300px at 0% 0%, rgba(255,200,87,0.22), transparent 60%), linear-gradient(160deg, #0B1530, #0B0B16) !important; }
+[data-ld~="jackpot-powerball"]:hover, [data-ld~="jackpot-mega"]:hover { transform: translateY(-4px); }
+[data-ld~="icon-0"], [data-ld~="icon-1"], [data-ld~="icon-2"] { box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 20px -8px rgba(0,0,0,0.6); }
+[data-ld~="bar"] { transform-origin: bottom; animation: ld-grow .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes ld-grow { from { transform: scaleY(0); } }
+
+[data-ld~="pro-border"] { background: linear-gradient(140deg, #FFC857, #1FD3A8 50%, #7C5CFF) !important; box-shadow: 0 30px 80px -30px rgba(255,200,87,0.35); }
+[data-ld~="badge"] { background: linear-gradient(90deg, #FFC857, #FF9F5A) !important; }
+
+[data-ld~="btn-primary"] { background: linear-gradient(180deg, #2BE3B6, #00A383) !important; box-shadow: 0 10px 30px -10px rgba(31,211,168,0.7), inset 0 1px 0 rgba(255,255,255,0.35); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; cursor: pointer; }
+[data-ld~="btn-primary"]:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 16px 40px -12px rgba(31,211,168,0.85), inset 0 1px 0 rgba(255,255,255,0.35); }
+[data-ld~="btn-ghost"] { transition: background-color .15s ease, border-color .15s ease; cursor: pointer; }
+[data-ld~="btn-ghost"]:hover { background-color: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.3) !important; }
+[data-ld~="btn-dark"] { transition: transform .15s ease; cursor: pointer; }
+[data-ld~="btn-dark"]:hover { transform: translateY(-1px); }
+
+[data-ld~="final-cta"] { background:
+  radial-gradient(700px 400px at 100% 0%, rgba(255,200,87,0.55), transparent 60%),
+  radial-gradient(700px 400px at 0% 100%, rgba(124,92,255,0.45), transparent 60%),
+  linear-gradient(135deg, #00A383, #0E7A67) !important; }
+
+[data-ld~="btn-primary"]:focus-visible, [data-ld~="btn-ghost"]:focus-visible, [data-ld~="btn-dark"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid #FFC857; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ld] { animation: none !important; transition: none !important; }
+}
+`;
 
 /* ── Styles ── */
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FFFFFF' },
-  scroll: { minHeight: '100%' as any, maxWidth: 1280, width: '100%' as any, alignSelf: 'center' as any },
+  root: { flex: 1, backgroundColor: C.ink },
+  scroll: { minHeight: '100%' as any, backgroundColor: C.ink },
+  container: { width: '100%' as any, maxWidth: 1200, alignSelf: 'center' },
 
   /* Nav */
-  navShell: {
-    position: 'relative',
-    zIndex: 30,
-  },
-  navBand: Platform.select({
-    web: {
-      backgroundColor: '#FFFFFF',
-      width: '100vw' as any,
-      marginLeft: 'calc(50% - 50vw)' as any,
-    } as any,
-    default: {
-      backgroundColor: '#FFFFFF',
-      width: '100%' as any,
-      alignSelf: 'stretch' as any,
-    },
-  }),
-  navInner: {
-    maxWidth: 1280,
-    width: '100%' as any,
-    alignSelf: 'center' as any,
+  navShell: { position: 'relative', zIndex: 30 },
+  navBand: {
+    backgroundColor: 'rgba(6,9,19,0.92)',
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingBottom: 14,
+  },
+  navLinks: { flexDirection: 'row', alignItems: 'center', gap: 28 },
+  navLink: { color: C.muted, fontSize: 14, fontWeight: '500' },
+  navGhost: {
     paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  navGhostText: { color: C.text, fontSize: 14, fontWeight: '600' },
+  navPrimary: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: C.tealDeep, marginLeft: -16 },
+  navPrimaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+
+  hamburger: { width: 28, height: 20, justifyContent: 'space-between', paddingVertical: 1 },
+  hamburgerBar: { height: 2, borderRadius: 2, backgroundColor: C.text },
+  mobileOverlay: { position: 'absolute', top: '100%' as any, left: 0, right: 0, zIndex: 40 },
+  mobileBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
+  mobileDrawer: {
+    backgroundColor: C.ink2,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 20,
-    flexWrap: 'nowrap',
-    gap: 12,
-    zIndex: 20,
   },
-  navWide: { paddingHorizontal: 40 },
-  navLogoWrap: { justifyContent: 'center', minHeight: 24 },
-    /* Hamburger */
-    hamburger: {
-      width: 40,
-      height: 40,
-      position: 'relative',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    hamburgerBar: {
-      width: 19,
-      height: 2,
-      borderRadius: 2,
-      backgroundColor: '#1F2937',
-      position: 'absolute',
-    },
-    hamburgerBarTop: { top: 11 },
-    hamburgerBarMid: { top: 18 },
-    hamburgerBarBot: { top: 25 },
-    hamburgerBarTopOpen: { top: 18, transform: [{ rotate: '45deg' }] },
-    hamburgerBarMidOpen: { opacity: 0 },
-    hamburgerBarBotOpen: { top: 18, transform: [{ rotate: '-45deg' }] },
-    /* Mobile Drawer */
-    mobileOverlay: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
-      zIndex: 40,
-    },
-    mobileOverlayBackdrop: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.46)',
-    },
-    mobileDrawer: {
-      position: 'relative',
-      backgroundColor: '#FFFFFF',
-      borderBottomWidth: 1,
-      borderBottomColor: '#E2E8F0',
-      paddingHorizontal: 16,
-      paddingBottom: 24,
-      zIndex: 41,
-    },
-    mobileDrawerItem: {
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F1F5F9',
-    },
-    mobileDrawerText: { fontSize: 15, color: '#1F2937', fontWeight: '500' },
-  navLinks: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  navLink: { color: '#1F2937', fontSize: 14, fontWeight: '400', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  navLoginBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: 'rgba(148, 163, 184, 0.12)',
+  mobileDrawerItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  mobileDrawerText: { color: C.text, fontSize: 16, fontWeight: '500' },
+  mobileDrawerCtas: { flexDirection: 'row', gap: 10, marginTop: 16 },
+
+  /* Buttons */
+  btn: {
+    borderRadius: 999,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
   },
-  navLoginText: { color: '#111827', fontSize: 14, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  btnLg: { paddingHorizontal: 28, paddingVertical: 16, flexGrow: 0 },
+  btnLgText: { fontSize: 16 },
+  btnPrimary: { backgroundColor: C.tealDeep },
+  btnPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  btnGhost: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  btnGhostText: { color: C.text, fontSize: 15, fontWeight: '600' },
+  btnDark: { backgroundColor: C.ink },
+  btnDarkText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 
   /* Hero */
-  hero: {
+  heroBand: { position: 'relative', overflow: 'hidden', backgroundColor: C.ink2 },
+  orbA: { position: 'absolute', width: 420, height: 420, borderRadius: 210, right: -80, top: 120 },
+  orbB: { position: 'absolute', width: 360, height: 360, borderRadius: 180, left: '35%' as any, bottom: -160 },
+  hero: { paddingTop: 48, paddingBottom: 64, gap: 48 },
+  heroWide: { flexDirection: 'row', alignItems: 'center', paddingTop: 88, paddingBottom: 112, gap: 56 },
+  heroCopy: {},
+  heroCopyWide: { flex: 1.05 },
+  livePill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 88,
-    paddingBottom: 80,
-  },
-  heroWide: { paddingTop: 112, paddingBottom: 88 },
-  heroTitle: {
-    fontSize: 44,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    lineHeight: 56,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  heroTitleWide: { fontSize: 60, lineHeight: 72, fontWeight: '700' },
-  heroTitleAccent: {
-    color: '#00A585',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fontWeight: '700',
-  },
-  heroSub: {
-    fontSize: 16,
-    color: '#334155',
-    textAlign: 'center',
-    marginTop: 20,
-    maxWidth: 620,
-    lineHeight: 24,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  heroSubWide: { fontSize: 18, lineHeight: 30, maxWidth: 680 },
-  heroCtas: {
-    flexDirection: 'column',
-    marginTop: 36,
-    marginBottom: 0,
-    alignItems: 'center',
-    width: '100%' as any,
-    alignSelf: 'center' as any,
-    zIndex: 1,
-  },
-  heroCtasWide: { maxWidth: 600 },
-  ctaPrimary: {
-    ...landingCtaPrimaryButton,
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  ctaPrimaryWide: {
-    alignSelf: 'center',
-    minWidth: 160,
-  },
-  ctaPrimaryWeb: {
-    cursor: 'pointer',
-  } as any,
-  ctaPrimaryText: landingCtaPrimaryButtonText,
-  ctaOutline: {
+    alignSelf: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+    borderColor: 'rgba(31,211,168,0.35)',
+    backgroundColor: 'rgba(31,211,168,0.08)',
+    marginBottom: 24,
   },
-  ctaOutlineText: { color: '#111827', fontSize: 17, fontWeight: '500', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  /* Section */
-  section: { paddingHorizontal: 20, paddingVertical: 76 },
-  featuresSection: { marginBottom: 50 },
-  sectionWide: { paddingHorizontal: 40, alignItems: 'center' as any },
-  /** Gray band edge-to-edge on web despite scroll content maxWidth */
-  howItWorksBand: Platform.select({
-    web: {
-      backgroundColor: '#F8FAFC',
-      width: '100vw' as any,
-      marginLeft: 'calc(50% - 50vw)' as any,
-    } as any,
-    default: {
-      backgroundColor: '#F8FAFC',
-      width: '100%' as any,
-      alignSelf: 'stretch' as any,
-    },
-  }),
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: '500',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 12,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  sectionSub: {
-    fontSize: 14,
-    color: '#475569',
-    textAlign: 'center',
-    marginBottom:48,
-    maxWidth: 700,
-    alignSelf: 'center' as any,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  howItWorksTitle: { fontWeight: '600' },
-  howItWorksSub: { marginBottom: 40, maxWidth: 520 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.teal },
+  livePillText: { color: '#CFF7EC', fontSize: 13, fontWeight: '500' },
+  livePillStrong: { color: '#FFFFFF', fontWeight: '800' },
+  heroTitle: { color: C.text, fontSize: 42, lineHeight: 46, fontWeight: '800', letterSpacing: -1.2 },
+  heroTitleMid: { fontSize: 58, lineHeight: 62, letterSpacing: -1.8 },
+  heroTitleWide: { fontSize: 64, lineHeight: 68, letterSpacing: -2.2 },
+  heroTitleAccent: { color: C.teal },
+  heroSub: { color: C.muted, fontSize: 17, lineHeight: 27, marginTop: 22, maxWidth: 560 },
+  heroSubWide: { fontSize: 19, lineHeight: 30 },
+  heroCtas: { marginTop: 32, gap: 12 },
+  heroCtasRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginTop: 22 },
+  trustItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trustText: { color: C.muted, fontSize: 13 },
 
-  /* Feature Cards */
-  featureGrid: { gap: 16, width: '100%' },
-  featureGridWide: {
+  /* Pick card */
+  pickWrap: { width: '100%' as any, maxWidth: 520, alignSelf: 'center' },
+  pickWrapWide: { flex: 1, alignSelf: 'auto' as any },
+  pickCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 24,
+  },
+  pickHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 },
+  pickEyebrow: { color: C.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  pickMode: { color: C.text, fontSize: 20, fontWeight: '700', marginTop: 4 },
+  pickChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  pickChipText: { color: C.muted, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  ballRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 6, marginBottom: 24 },
+  ball: { alignItems: 'center', justifyContent: 'center' },
+  ballText: { fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
+  pickStats: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    maxWidth: WEB_CONTENT_MAX_WIDTH,
-    gap: 20,
-  },
-  featureCard: {
-    backgroundColor: '#F8FAFC',
+    gap: 12,
+    padding: 16,
     borderRadius: 16,
-    padding: 24,
-    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  featureCardWide: { width: 280, flexGrow: 0 },
-  featureSvgWrap: {
-    marginBottom: 12,
-    width: FEATURE_ICON_SIZE,
-    height: FEATURE_ICON_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pickStatWide: { flexBasis: '100%' as any },
+  pickStatHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+  pickStat: { flex: 1 },
+  pickStatLabel: { color: C.faint, fontSize: 12, fontWeight: '500' },
+  pickStatValue: { color: C.text, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 2 },
+  meterTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  meterFill: { height: 8, borderRadius: 4, backgroundColor: C.teal },
+  modeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
+  modeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  featureTitle: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 6, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  featureDesc: { fontSize: 13, color: '#475569', lineHeight: 20, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  modeChipActive: { backgroundColor: 'rgba(31,211,168,0.14)', borderColor: 'rgba(31,211,168,0.55)' },
+  modeChipText: { color: C.faint, fontSize: 12, fontWeight: '600' },
+  modeChipTextActive: { color: C.teal },
+  pickFoot: { color: C.faint, fontSize: 12, marginTop: 18, lineHeight: 18 },
 
-  /* Steps — timeline (wide) / stacked (narrow) */
-  stepsRow: { gap: 28, width: '100%', maxWidth: WEB_CONTENT_MAX_WIDTH, alignSelf: 'center' as any },
-  stepsRowWide: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    gap: 0,
-    width: '100%' as any,
-  },
-  stepCard: {
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    width: '100%',
-  },
-  stepCardWide: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: 0,
-  },
-  stepBadgeRow: {
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  stepBadgeRowWide: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-  },
-  stepHLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#E2E8F0',
-    minWidth: 0,
-  },
-  stepHLineHidden: {
-    backgroundColor: 'transparent',
-  },
-  stepBadge: {
-    width: 36,
-    height: 36,
+  /* Sections */
+  band: { paddingVertical: 80, backgroundColor: C.ink },
+  bandAlt: { backgroundColor: C.ink2, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.border },
+  sectionHead: { marginBottom: 40, maxWidth: 720 },
+  eyebrow: { color: C.teal, fontSize: 12, fontWeight: '700', letterSpacing: 2.4, marginBottom: 12 },
+  sectionTitle: { color: C.text, fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8 },
+  sectionTitleMid: { fontSize: 42, lineHeight: 48, letterSpacing: -1.2 },
+  sectionSub: { color: C.muted, fontSize: 17, lineHeight: 26, marginTop: 14 },
+  rowWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+
+  /* Jackpots */
+  jackpotRow: { gap: 20 },
+  jackpotCard: {
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  stepNum: {
-    color: '#111827',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  stepTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  stepTitleWide: {
-    maxWidth: 190,
-    alignSelf: 'center' as any,
-  },
-  stepDesc: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 20,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  stepDescWide: {
-    maxWidth: 190,
-    alignSelf: 'center' as any,
-  },
-
-  /* Games */
-  /** Tighter space before CTA: half of `section` bottom padding (76 → 38) */
-  supportedGamesSection: { paddingBottom: 38 },
-  gamesRow: { gap: 16, width: '100%' },
-  gamesRowWide: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    maxWidth: 816,
-    gap: 24,
-  },
-  supportedGamesTitle: { marginBottom: 40 },
-  gameCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderWidth: 1,
     padding: 28,
-    marginVertical: 20,
-    alignItems: 'center',
-    width: '100%',
+    backgroundColor: '#10101C',
+    overflow: 'hidden',
   },
-  gameCardWide: { width: 340 },
-  gameLogoPowerball: {
-    width: 220,
-    height: 72,
-    marginBottom: 16,
-    resizeMode: 'contain',
+  jackpotTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 28 },
+  jackpotLogoChip: { backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  logoPowerball: { width: 120, height: 28 },
+  logoMega: { width: 96, height: 36 },
+  nextDrawPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  gameLogoMegaMillions: {
-    width: 260,
-    height: 72,
-    marginBottom: 16,
-    resizeMode: 'contain',
+  nextDrawText: { color: C.text, fontSize: 12, fontWeight: '600' },
+  jackpotLabel: { color: C.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.8 },
+  jackpotAmountRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 6 },
+  jackpotDollar: { color: C.text, fontSize: 32, fontWeight: '700', marginBottom: 14, marginRight: 2 },
+  jackpotAmount: { color: C.text, fontSize: 76, lineHeight: 84, fontWeight: '800', letterSpacing: -3, fontVariant: ['tabular-nums'] },
+  jackpotUnit: { color: C.muted, fontSize: 22, fontWeight: '600', marginBottom: 16, marginLeft: 10 },
+  jackpotRules: { color: C.muted, fontSize: 13, marginTop: 14 },
+
+  /* Bento */
+  bento: { gap: 16 },
+  featureCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    padding: 26,
   },
-  gameResultPrimary: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#148c74',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 6,
-    letterSpacing: 0.2,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  gameResultMeta: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 18,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  gameTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  gameDesc: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  span1: { flexBasis: 'calc(33.333% - 11px)' as any, flexGrow: 0 },
+  span2: { flexBasis: 'calc(66.666% - 6px)' as any, flexGrow: 0 },
+  span3: { flexBasis: '100%' as any },
+  half: { flexBasis: 'calc(50% - 8px)' as any },
+  full: { flexBasis: '100%' as any },
+  featureIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  featureBodyRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 28 },
+  featureTextCol: { flex: 1 },
+  featureTitle: { color: C.text, fontSize: 19, fontWeight: '700', marginBottom: 8 },
+  featureDesc: { color: C.muted, fontSize: 15, lineHeight: 23 },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 120, marginTop: 20, minWidth: 260 },
+  chartCol: { flex: 1, alignItems: 'center', height: '100%' as any },
+  chartTrack: { flex: 1, width: '100%' as any, justifyContent: 'flex-end' },
+  chartBar: { width: '100%' as any, borderRadius: 6 },
+  chartLabel: { color: C.faint, fontSize: 11, marginTop: 6, fontVariant: ['tabular-nums'] },
+
+  /* Steps */
+  steps: { gap: 28 },
+  stepsWide: { flexDirection: 'row', gap: 24 },
+  step: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.14)', paddingTop: 20 },
+  stepWide: { flex: 1 },
+  stepNum: { color: C.muted, fontSize: 56, lineHeight: 60, fontWeight: '800', letterSpacing: -2, marginBottom: 12 },
+  stepTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  stepDesc: { color: C.muted, fontSize: 15, lineHeight: 23 },
 
   /* Pricing */
-  pricingBand: {
-    marginTop: 32,
-    marginHorizontal: 20,
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  pricingBandWide: {
-    marginHorizontal: 40,
-    paddingVertical: 64,
-  },
-  pricingEyebrow: {
-    color: '#00A383',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 10,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  pricingHeading: {
-    fontSize: 26,
-    fontWeight: '600',
-    color: '#0F172A',
-    textAlign: 'center' as const,
-    marginBottom: 10,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  pricingHeadingWide: { fontSize: 31 },
-  pricingSub: {
-    fontSize: 14,
-    color: '#475569',
-    textAlign: 'center' as const,
-    maxWidth: 560,
-    lineHeight: 22,
-    marginBottom: 28,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  pricingPlansRow: {
-    flexDirection: 'column' as const,
-    gap: 16,
-    width: '100%' as any,
-    maxWidth: 820,
-  },
-  pricingPlansRowWide: {
-    flexDirection: 'row' as const,
-    gap: 20,
-  },
-  pricingCard: {
-    flex: 1,
-    borderRadius: 16,
+  pricingRow: { gap: 20, alignItems: 'stretch' },
+  planHalf: { flexBasis: 'calc(50% - 10px)' as any, flexGrow: 1 },
+  planCard: {
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    gap: 6,
-    ...(Platform.OS === 'web'
-      ? ({ boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 12px 24px -12px rgba(15,23,42,0.08)' } as object)
-      : {}),
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    padding: 30,
   },
-  pricingCardPro: {
-    borderColor: '#00A383',
-    borderWidth: 2,
-    position: 'relative' as const,
-  },
-  pricingBadge: {
-    position: 'absolute' as const,
-    top: -12,
-    right: 20,
-    backgroundColor: '#00A383',
+  planProOuter: { borderRadius: 25, padding: 1.5, backgroundColor: C.gold },
+  planPro: { backgroundColor: '#0C1222', borderWidth: 0, flex: 1, borderRadius: 24 },
+  planBadge: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 999,
+    backgroundColor: C.gold,
   },
-  pricingBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  pricingCardTier: {
-    color: '#475569',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase' as const,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  pricingCardTierPro: { color: '#00A383' },
-  pricingCardPrice: {
-    color: '#0F172A',
-    fontSize: 34,
-    fontWeight: '700',
-    marginBottom: 12,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  pricingCardPricePro: {},
-  pricingCardPriceNote: {
-    color: '#64748B',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  pricingCardLine: {
-    color: '#334155',
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
+  planBadgeText: { color: '#1A1300', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  planTier: { color: C.muted, fontSize: 14, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
+  planPriceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 14 },
+  planPrice: { color: C.text, fontSize: 52, lineHeight: 56, fontWeight: '800', letterSpacing: -1.5 },
+  planPer: { color: C.muted, fontSize: 15, marginBottom: 9 },
+  planNote: { color: C.muted, fontSize: 14, marginTop: 8 },
+  planList: { gap: 12, marginTop: 24, marginBottom: 28 },
+  planLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  planLineText: { color: C.text, fontSize: 15 },
+  planBtn: { marginTop: 'auto' as any, flexGrow: 0 },
+  planFine: { color: C.faint, fontSize: 12, textAlign: 'center', marginTop: 12 },
 
-  /* CTA Banner */
-  ctaBanner: {
-    marginVertical: 40,
-    marginHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingVertical: 48,
-    paddingHorizontal: 28,
+  /* Final CTA */
+  finalCta: {
+    borderRadius: 32,
+    paddingHorizontal: 24,
+    paddingVertical: 56,
     alignItems: 'center',
+    backgroundColor: C.tealDeep,
+    overflow: 'hidden',
   },
-  ctaBannerWide: { marginHorizontal: 40, paddingVertical: 56, paddingHorizontal: 40 },
-  ctaBannerTitle: {
-    fontSize: 27,
-    fontWeight: '500',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 10,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  ctaBannerTitleWide: { fontSize: 31 },
-  ctaBannerSub: {
-    fontSize: 14,
-    color: '#475569',
-    textAlign: 'center',
-    marginBottom: 24,
-    maxWidth: 480,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  /* Store badges */
-  storeBadgesRow: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    marginTop: -6,
-    marginBottom: 44,
-  },
-  storeBadgesRowWide: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  storeBadgeHit: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storeBadgeHitWeb: Platform.select({
-    web: { cursor: 'pointer' } as any,
-    default: {},
-  }),
-  /** badge-appstore.png 426×142 */
-  storeBadgeImageApp: {
-    height: 50,
-    width: Math.round((50 * 426) / 142),
-  },
-  /** badge-googleplay.png 478×142 */
-  storeBadgeImageGoogle: {
-    height: 50,
-    width: Math.round((50 * 478) / 142),
-  },
+  finalCtaWide: { paddingVertical: 80 },
+  finalBalls: { flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 28 },
+  finalTitle: { color: '#FFFFFF', fontSize: 32, lineHeight: 38, fontWeight: '800', textAlign: 'center', letterSpacing: -1 },
+  finalTitleMid: { fontSize: 48, lineHeight: 54, letterSpacing: -1.6 },
+  finalSub: { color: 'rgba(255,255,255,0.85)', fontSize: 17, lineHeight: 26, textAlign: 'center', marginTop: 14, marginBottom: 30, maxWidth: 560 },
+  storeRow: { flexDirection: 'row', gap: 12, marginTop: 28, flexWrap: 'wrap', justifyContent: 'center' },
+  storeBadge: { opacity: 0.95 },
+  storeImgApple: { width: 140, height: 46 },
+  storeImgGoogle: { width: 156, height: 46 },
 
   /* Footer */
-  footerBand: Platform.select({
-    web: {
-      backgroundColor: '#FFFFFF',
-      width: '100vw' as any,
-      marginLeft: 'calc(50% - 50vw)' as any,
-      marginTop: 76,
-      borderTopWidth: 1,
-      borderTopColor: '#E2E8F0',
-    } as any,
-    default: {
-      backgroundColor: '#FFFFFF',
-      width: '100%' as any,
-      alignSelf: 'stretch' as any,
-      marginTop: 76,
-      borderTopWidth: 1,
-      borderTopColor: '#E2E8F0',
-    },
-  }),
-  footerInner: {
-    maxWidth: 1280,
-    width: '100%' as any,
-    alignSelf: 'center' as any,
-    alignItems: 'center',
-    paddingVertical: 52,
-    paddingHorizontal: 20,
-  },
-  footerText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginTop: 4, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
-  footerDisclaimer: {
-    color: '#475569',
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center' as const,
-    marginTop: 20,
-    marginBottom: 12,
-    maxWidth: 720,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
+  footer: { paddingTop: 48, paddingBottom: 56, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.ink },
+  footerDisclaimer: { color: C.faint, fontSize: 13, lineHeight: 20, marginTop: 20, marginBottom: 16, maxWidth: 820 },
+  footerText: { color: C.faint, fontSize: 12, marginTop: 4 },
 });
