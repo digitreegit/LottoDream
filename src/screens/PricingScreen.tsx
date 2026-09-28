@@ -15,7 +15,13 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
-import { startPremiumCheckout, openBillingPortal } from '../services/paymentService';
+import {
+  startFreeTrial,
+  openCheckout,
+  openBillingPortal,
+  canPurchaseInApp,
+  type StripeFlowOutcome,
+} from '../services/paymentService';
 import {
   PREMIUM_PRICE_DISPLAY,
   PREMIUM_PRICE_PERIOD,
@@ -126,46 +132,96 @@ interface Props {
 export function PricingScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const { isPremium, isTrialing, cancelAtPeriodEnd, currentPeriodEnd, refresh } = useEntitlement();
-  const [checkoutStatus, setCheckoutStatus] = useState<
-    null | 'loading' | 'redirected' | 'portal' | 'error'
-  >(null);
-  const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
+  const {
+    isPremium,
+    isTrialing,
+    isPastDue,
+    trialEligible,
+    hasPaymentMethod,
+    trialDaysLeft,
+    trialEnd,
+    cancelAtPeriodEnd,
+    currentPeriodEnd,
+    refresh,
+  } = useEntitlement();
+  const [busy, setBusy] = useState<null | 'primary' | 'portal'>(null);
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
 
   const isWide = width >= 720;
-
-  const handleUpgrade = async () => {
-    if (!user) {
-      navigation?.navigate?.('Auth') ?? navigation?.navigate?.('Login');
-      return;
-    }
-    setCheckoutStatus('loading');
-    setCheckoutMsg(null);
-    const outcome = await startPremiumCheckout();
-    if (outcome.status === 'redirected') {
-      setCheckoutStatus('redirected');
-      setCheckoutMsg('Redirecting you to secure Stripe checkout…');
-      void refresh();
-    } else {
-      setCheckoutStatus('error');
-      setCheckoutMsg(outcome.reason);
-    }
-  };
-
-  const handleManage = async () => {
-    setCheckoutStatus('portal');
-    setCheckoutMsg(null);
-    const outcome = await openBillingPortal();
-    if (outcome.status !== 'redirected') {
-      setCheckoutStatus('error');
-      setCheckoutMsg(outcome.reason);
-    }
-  };
+  const purchasable = canPurchaseInApp();
+  const needsCard = isTrialing && !hasPaymentMethod;
 
   const formatDate = (iso: string | null) =>
     iso
       ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       : null;
+
+  const handleStripeOutcome = (outcome: StripeFlowOutcome) => {
+    if (outcome.status === 'error') {
+      setNote({ text: outcome.reason, error: true });
+    } else if (outcome.status === 'redirected') {
+      setNote({ text: 'Opening secure Stripe checkout…' });
+    } else {
+      if (outcome.checkout === 'success') setNote({ text: 'You’re all set — thanks for subscribing!' });
+      else setNote(null);
+      void refresh();
+    }
+  };
+
+  const handlePrimary = async () => {
+    if (!user) {
+      navigation?.navigate?.('Auth') ?? navigation?.navigate?.('Login');
+      return;
+    }
+    setBusy('primary');
+    setNote(null);
+    try {
+      if (trialEligible) {
+        const outcome = await startFreeTrial();
+        if (outcome.status === 'started') {
+          setNote({
+            text: `Premium unlocked! Your free trial runs until ${formatDate(outcome.trialEnd)}.`,
+          });
+          void refresh();
+        } else {
+          setNote({ text: outcome.reason, error: true });
+          if (outcome.code) void refresh();
+        }
+      } else {
+        handleStripeOutcome(await openCheckout());
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleManage = async () => {
+    setBusy('portal');
+    setNote(null);
+    try {
+      handleStripeOutcome(await openBillingPortal());
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const primaryLabel = !user || trialEligible
+    ? `Start ${PREMIUM_TRIAL_DAYS}-day free trial`
+    : `Subscribe — ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD}`;
+
+  const statusLine = (() => {
+    if (cancelAtPeriodEnd && currentPeriodEnd) return `Premium ends ${formatDate(currentPeriodEnd)}.`;
+    if (needsCard) {
+      return `Premium stays on until ${formatDate(trialEnd)}. Add a card to continue at ${PREMIUM_PRICE_DISPLAY}/month — you won’t be charged before then.`;
+    }
+    if (isTrialing) return `Trial ends ${formatDate(trialEnd)}, then ${PREMIUM_PRICE_DISPLAY}/month.`;
+    if (currentPeriodEnd) return `Renews ${formatDate(currentPeriodEnd)}.`;
+    return null;
+  })();
+
+  const fineprint = trialEligible || !user
+    ? `No credit card needed for the ${PREMIUM_TRIAL_DAYS}-day trial. Add one anytime to continue at ${PREMIUM_PRICE_DISPLAY}/month in ${PREMIUM_CURRENCY}; if you don’t, you simply return to Free. Secure billing via Stripe; taxes may apply.`
+    : `Secure billing via Stripe. ${PREMIUM_PRICE_DISPLAY}/month in ${PREMIUM_CURRENCY}. Cancel anytime; taxes may apply.`;
 
   return (
     <ScrollView
@@ -181,8 +237,8 @@ export function PricingScreen({ navigation }: Props) {
           Try free for {PREMIUM_TRIAL_DAYS} days.{'\n'}Then {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}.
         </Text>
         <Text style={styles.heroSub}>
-          Start your {PREMIUM_TRIAL_DAYS}-day free trial — every AI mode, today's fortune
-          lucky numbers, deeper analytics, and all six lottery games. Cancel anytime.
+          Every AI mode, today's fortune lucky numbers, deeper analytics, and all six
+          lottery games — free for {PREMIUM_TRIAL_DAYS} days. No credit card required.
         </Text>
       </View>
 
@@ -229,8 +285,8 @@ export function PricingScreen({ navigation }: Props) {
             </Text>
           </View>
           <Text style={[styles.planSub, styles.planSubOnFeatured]}>
-            {PREMIUM_TRIAL_DAYS}-day free trial, then {PREMIUM_PRICE_DISPLAY}/month. Every AI mode,
-            today's fortune, deeper analytics, and unlimited saved sets. Cancel anytime.
+            {PREMIUM_TRIAL_DAYS} days free — no card needed. Then {PREMIUM_PRICE_DISPLAY}/month for every
+            AI mode, today's fortune, deeper analytics, and unlimited saved sets.
           </Text>
           <View style={styles.planBullets}>
             <Bullet
@@ -243,70 +299,87 @@ export function PricingScreen({ navigation }: Props) {
             <Bullet text="Priority support" onFeatured />
           </View>
 
-          {isPremium ? (
+          {!purchasable ? (
             <View style={{ marginTop: 'auto' }}>
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>
-                  {isTrialing ? '✓ Free trial active' : '✓ Premium active'}
+              {isPremium ? (
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeText}>✓ Premium active</Text>
+                </View>
+              ) : null}
+              <Text style={styles.fineprint}>
+                Plans are managed on the LottoDream website. Your Premium access syncs to this app
+                automatically when you sign in.
+              </Text>
+            </View>
+          ) : isPremium || isPastDue ? (
+            <View style={{ marginTop: 'auto' }}>
+              <View style={[styles.activeBadge, isPastDue && styles.warnBadge]}>
+                <Text style={[styles.activeBadgeText, isPastDue && styles.warnBadgeText]}>
+                  {isPastDue
+                    ? '⚠ Payment failed'
+                    : isTrialing
+                      ? `✓ Free trial · ${trialDaysLeft ?? 0} ${trialDaysLeft === 1 ? 'day' : 'days'} left`
+                      : '✓ Premium active'}
                 </Text>
               </View>
-              {currentPeriodEnd ? (
+              {isPastDue ? (
                 <Text style={styles.fineprint}>
-                  {cancelAtPeriodEnd
-                    ? `Cancels on ${formatDate(currentPeriodEnd)}.`
-                    : isTrialing
-                      ? `Trial ends ${formatDate(currentPeriodEnd)}, then ${PREMIUM_PRICE_DISPLAY}/mo.`
-                      : `Renews ${formatDate(currentPeriodEnd)}.`}
+                  We couldn’t charge your card. Update your payment method to restore Premium.
                 </Text>
+              ) : statusLine ? (
+                <Text style={styles.fineprint}>{statusLine}</Text>
+              ) : null}
+              {needsCard ? (
+                <TouchableOpacity
+                  style={[styles.planCta, styles.planCtaPrimary, busy && styles.planCtaDisabled]}
+                  onPress={handlePrimary}
+                  activeOpacity={0.88}
+                  disabled={busy !== null}
+                >
+                  {busy === 'primary' ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.planCtaPrimaryText}>Keep Premium — add a card</Text>
+                  )}
+                </TouchableOpacity>
               ) : null}
               <TouchableOpacity
                 style={[styles.planCta, styles.planCtaGhostDark]}
                 onPress={handleManage}
                 activeOpacity={0.88}
-                disabled={checkoutStatus === 'portal'}
+                disabled={busy !== null}
               >
-                {checkoutStatus === 'portal' ? (
+                {busy === 'portal' ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.planCtaGhostDarkText}>Manage subscription</Text>
+                  <Text style={styles.planCtaGhostDarkText}>
+                    {isPastDue ? 'Update payment method' : 'Manage subscription'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
-              style={[
-                styles.planCta,
-                styles.planCtaPrimary,
-                checkoutStatus === 'loading' && styles.planCtaDisabled,
-              ]}
-              onPress={handleUpgrade}
+              style={[styles.planCta, styles.planCtaPrimary, busy && styles.planCtaDisabled]}
+              onPress={handlePrimary}
               activeOpacity={0.88}
-              disabled={checkoutStatus === 'loading'}
+              disabled={busy !== null}
             >
-              {checkoutStatus === 'loading' ? (
+              {busy === 'primary' ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.planCtaPrimaryText}>
-                  {user ? `Start ${PREMIUM_TRIAL_DAYS}-day free trial` : 'Sign in to start free trial'}
-                </Text>
+                <Text style={styles.planCtaPrimaryText}>{primaryLabel}</Text>
               )}
             </TouchableOpacity>
           )}
 
-          {checkoutMsg ? (
-            <Text
-              style={[
-                styles.checkoutNote,
-                checkoutStatus === 'error' && styles.checkoutNoteError,
-              ]}
-            >
-              {checkoutMsg}
+          {note ? (
+            <Text style={[styles.checkoutNote, note.error && styles.checkoutNoteError]}>
+              {note.text}
             </Text>
           ) : null}
 
-          <Text style={styles.fineprint}>
-            {`Secure checkout & billing via Stripe. ${PREMIUM_TRIAL_DAYS}-day free trial, then ${PREMIUM_PRICE_DISPLAY}/month in ${PREMIUM_CURRENCY}. Cancel anytime; taxes may apply.`}
-          </Text>
+          {purchasable ? <Text style={styles.fineprint}>{fineprint}</Text> : null}
         </View>
       </View>
 
@@ -341,7 +414,7 @@ export function PricingScreen({ navigation }: Props) {
         <Text style={styles.faqTitle}>Questions, answered</Text>
         <Faq
           q={`How does the ${PREMIUM_TRIAL_DAYS}-day free trial work?`}
-          a={`You get full Premium access free for ${PREMIUM_TRIAL_DAYS} days. If you don't cancel before the trial ends, your card is charged ${PREMIUM_PRICE_DISPLAY}/month. You can cancel anytime from "Manage subscription".`}
+          a={`Tap “Start free trial” — no credit card needed — and every Premium feature unlocks for ${PREMIUM_TRIAL_DAYS} days. Add a card anytime to continue at ${PREMIUM_PRICE_DISPLAY}/month once the trial ends. If you don't, you simply go back to Free. You're never charged by surprise.`}
         />
         <Faq
           q="Can I cancel anytime?"
@@ -637,6 +710,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     fontFamily: FONT_FAMILY,
+  },
+  warnBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+  },
+  warnBadgeText: {
+    color: '#FCD34D',
   },
   checkoutNote: {
     marginTop: space.md,

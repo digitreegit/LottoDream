@@ -1,48 +1,37 @@
 {
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
+    "base": {
+      "node": "20.19.4"
+    },
     "preview": {
+      "extends": "base",
+      "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "ios": {
-        "buildType": "simulator"
-      }
-    },
-    "preview2": {
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "buildType": "simulator"
-      }
-    },
-    "preview3": {
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "buildType": "simulator"
       }
     },
     "production": {
+      "extends": "base",
+      "autoIncrement": true,
       "android": {
-        "buildType": "aab"
-      },
-      "ios": {
-        "buildType": "ipa"
+        "buildType": "app-bundle"
       }
     }
   },
   "submit": {
     "production": {
       "android": {
-        "serviceAccount": "~/.androidKeyStore/service-account.json",
+        "serviceAccountKeyPath": "./secrets/play-service-account.json",
         "track": "internal"
       },
       "ios": {
         "appleId": "your-apple-id@example.com",
-        "appleTeamId": "YOUR_TEAM_ID",
-        "bundleIdentifier": "com.lottodream.app"
+        "ascAppId": "YOUR_ASC_APP_ID",
+        "appleTeamId": "YOUR_TEAM_ID"
       }
     }
   }

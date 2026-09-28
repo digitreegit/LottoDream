@@ -1,105 +1,111 @@
 // ============================================
-// Payment Service – monthly Premium subscription (web)
+// Payment Service – Premium subscription via Stripe (web + iOS + Android)
 // ============================================
 //
-// Strategy (web-only):
-//   • `startPremiumCheckout()` calls the Supabase Edge Function
-//     `create-checkout-session`, which returns a Stripe Checkout URL for the
-//     $4.99/mo subscription (7-day free trial). We redirect the current tab.
-//   • A Stripe webhook (`stripe-webhook` Edge Function) flips
-//     `profiles.subscription_tier` to 'premium' for active/trialing subs.
-//   • `openBillingPortal()` calls `create-billing-portal-session` so the user
-//     can manage or cancel their subscription.
+// All billing runs through Supabase Edge Functions; the client never talks
+// to Stripe directly and never writes billing columns (a DB trigger blocks it).
 //
+//   • `startFreeTrial()`   – one tap, no card. `start-trial` creates a 14-day
+//                            trialing subscription and unlocks Premium now.
+//   • `openCheckout()`     – `create-checkout-session` picks the next step:
+//                            add a card to a trial, subscribe, or the portal.
+//   • `openBillingPortal()`– manage / cancel.
+//   • `deleteAccount()`    – cancels billing and deletes the account.
+//
+// Web redirects the current tab. Native opens Stripe in an in-app browser
+// that closes when Stripe returns to `lottodream://billing` (bounced through
+// the web app, see src/web-init.ts).
+//
+import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../config/supabase';
-import {
-  PREMIUM_PRODUCT_ID,
-  PREMIUM_PRICE_CENTS,
-  PREMIUM_CURRENCY,
-} from '../config/constants';
+import { APP_SCHEME, IOS_PURCHASE_MODE } from '../config/constants';
 
-export type CheckoutOutcome =
-  | { status: 'redirected'; provider: 'stripe' }
+export type StripeFlowOutcome =
+  /** Web: the tab is navigating to Stripe. */
+  | { status: 'redirected' }
+  /** Native: the in-app browser closed; `checkout` is set when Stripe returned. */
+  | { status: 'returned'; checkout: 'success' | 'cancelled' | null }
   | { status: 'error'; reason: string };
 
-async function invokeFunction(name: string): Promise<{ url?: string; error?: string }> {
-  const { data, error } = await supabase.functions.invoke(name, { body: {} });
+export type TrialOutcome =
+  | { status: 'started'; trialEnd: string | null }
+  | { status: 'error'; reason: string; code?: string };
+
+/** Whether this build may show purchase / trial CTAs. */
+export function canPurchaseInApp(): boolean {
+  return !(Platform.OS === 'ios' && IOS_PURCHASE_MODE === 'web_only');
+}
+
+const platform = Platform.OS === 'web' ? 'web' : 'native';
+
+async function invokeFunction<T extends Record<string, any>>(
+  name: string,
+): Promise<{ data?: T; error?: string; code?: string }> {
+  const { data, error } = await supabase.functions.invoke(name, { body: { platform } });
   if (error) {
-    // Surface the function's JSON error message when available.
-    const ctxBody = (error as any)?.context?.body;
-    return { error: ctxBody?.error || error.message || 'Request failed.' };
+    // FunctionsHttpError carries the Response; surface the function's JSON error.
+    const body = await (error as any)?.context?.json?.().catch(() => null);
+    return { error: body?.error || error.message || 'Request failed.', code: body?.code };
   }
-  return { url: (data as any)?.url, error: (data as any)?.error };
+  if ((data as any)?.error) return { error: (data as any).error, code: (data as any).code };
+  return { data: data as T };
 }
 
-/**
- * Start the Premium subscription checkout flow. Resolves after redirecting the
- * browser to Stripe Checkout. Entitlement is observed asynchronously via
- * `useEntitlement().refresh()` / realtime profile updates.
- */
-export async function startPremiumCheckout(): Promise<CheckoutOutcome> {
-  try {
-    if (typeof window === 'undefined') {
-      return { status: 'error', reason: 'Checkout is only available on the web.' };
-    }
-    const { url, error } = await invokeFunction('create-checkout-session');
-    if (error || !url) {
-      return { status: 'error', reason: error || 'Could not start checkout.' };
-    }
+async function openStripeUrl(url: string): Promise<StripeFlowOutcome> {
+  if (Platform.OS === 'web') {
     window.location.assign(url);
-    return { status: 'redirected', provider: 'stripe' };
-  } catch (err: any) {
-    return { status: 'error', reason: err?.message || 'Checkout failed.' };
+    return { status: 'redirected' };
   }
+  const result = await WebBrowser.openAuthSessionAsync(url, `${APP_SCHEME}://billing`);
+  if (result.type !== 'success') return { status: 'returned', checkout: null };
+  const checkout = Linking.parse(result.url).queryParams?.checkout;
+  return {
+    status: 'returned',
+    checkout: checkout === 'success' || checkout === 'cancelled' ? checkout : null,
+  };
 }
 
-/**
- * Open the Stripe Billing Portal so the user can manage / cancel their plan.
- */
-export async function openBillingPortal(): Promise<CheckoutOutcome> {
+async function runStripeFlow(fn: string, fallback: string): Promise<StripeFlowOutcome> {
   try {
-    if (typeof window === 'undefined') {
-      return { status: 'error', reason: 'Billing portal is only available on the web.' };
-    }
-    const { url, error } = await invokeFunction('create-billing-portal-session');
-    if (error || !url) {
-      return { status: 'error', reason: error || 'Could not open billing portal.' };
-    }
-    window.location.assign(url);
-    return { status: 'redirected', provider: 'stripe' };
+    const { data, error } = await invokeFunction<{ url?: string }>(fn);
+    if (error || !data?.url) return { status: 'error', reason: error || fallback };
+    return await openStripeUrl(data.url);
   } catch (err: any) {
-    return { status: 'error', reason: err?.message || 'Could not open billing portal.' };
+    return { status: 'error', reason: err?.message || fallback };
   }
 }
 
-/**
- * DEVELOPMENT ONLY. Marks the current user as premium without a real payment.
- * No-op in production builds.
- */
-export async function simulatePremiumGrant(): Promise<{ error: string | null }> {
-  if (!__DEV__) {
-    return { error: 'Disabled outside of development builds.' };
+/** Start the one-per-account, no-card free trial. */
+export async function startFreeTrial(): Promise<TrialOutcome> {
+  try {
+    const { data, error, code } = await invokeFunction<{ trial_end?: string }>('start-trial');
+    if (error) return { status: 'error', reason: error, code };
+    return { status: 'started', trialEnd: data?.trial_end ?? null };
+  } catch (err: any) {
+    return { status: 'error', reason: err?.message || 'Could not start your free trial.' };
   }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'Sign in first.' };
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      subscription_tier: 'premium',
-      subscription_status: 'active',
-      premium_since: new Date().toISOString(),
-      premium_source: 'manual',
-    })
-    .eq('id', user.id);
-
-  return { error: error?.message ?? null };
 }
 
-export const PREMIUM_CHECKOUT_INFO = {
-  productId: PREMIUM_PRODUCT_ID,
-  amountCents: PREMIUM_PRICE_CENTS,
-  currency: PREMIUM_CURRENCY,
-};
+/** Subscribe, or add a card to an active trial (the server decides). */
+export function openCheckout(): Promise<StripeFlowOutcome> {
+  return runStripeFlow('create-checkout-session', 'Could not start checkout.');
+}
+
+/** Open the Stripe Billing Portal so the user can manage / cancel their plan. */
+export function openBillingPortal(): Promise<StripeFlowOutcome> {
+  return runStripeFlow('create-billing-portal-session', 'Could not open billing portal.');
+}
+
+/** Permanently delete the account (cancels any subscription first). */
+export async function deleteAccount(): Promise<{ error: string | null }> {
+  try {
+    const { error } = await invokeFunction('delete-account');
+    if (error) return { error };
+    await supabase.auth.signOut().catch(() => undefined);
+    return { error: null };
+  } catch (err: any) {
+    return { error: err?.message || 'Could not delete your account.' };
+  }
+}

@@ -56,7 +56,9 @@ CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
 -- Writes only via service_role (Edge Function webhook). No client write policy.
 
 -- 3. Refresh entitlement view to surface subscription state.
-CREATE OR REPLACE VIEW public.my_entitlement
+-- DROP + CREATE: CREATE OR REPLACE VIEW can't reorder/insert columns.
+DROP VIEW IF EXISTS public.my_entitlement;
+CREATE VIEW public.my_entitlement
 WITH (security_invoker = true) AS
   SELECT
     p.id AS user_id,

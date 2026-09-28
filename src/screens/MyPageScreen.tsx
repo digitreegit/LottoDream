@@ -19,7 +19,8 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
 import { getProfile, signOut } from '../services/authService';
-import { PREMIUM_PRICE_DISPLAY, SUPPORT_EMAIL } from '../config/constants';
+import { PREMIUM_PRICE_DISPLAY, PREMIUM_TRIAL_DAYS, SUPPORT_EMAIL } from '../config/constants';
+import { deleteAccount } from '../services/paymentService';
 import {
   getSavedNumberSets,
   getNumberCollectionItems,
@@ -57,7 +58,7 @@ type MyPageRouteParams = {
 
 export function MyPageScreen({ navigation }: any) {
   const { user } = useAuth();
-  const { isPremium } = useEntitlement();
+  const { isPremium, isTrialing, trialDaysLeft, hasPaymentMethod, trialEligible } = useEntitlement();
   const route = useRoute();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [savedNumbers, setSavedNumbers] = useState<SavedNumberSet[]>([]);
@@ -81,6 +82,8 @@ export function MyPageScreen({ navigation }: any) {
     variant: AppFeedbackVariant;
   } | null>(null);
   const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     const focus = (route.params as MyPageRouteParams | undefined)?.focus;
@@ -263,6 +266,15 @@ export function MyPageScreen({ navigation }: any) {
     setSignOutConfirmVisible(true);
   };
 
+  const performDeleteAccount = async () => {
+    setDeletingAccount(true);
+    const { error } = await deleteAccount();
+    setDeletingAccount(false);
+    if (error) {
+      setAlertFeedback({ variant: 'error', title: 'Could not delete account', message: error });
+    }
+  };
+
   if (!user) {
     return (
       <View style={styles.container}>
@@ -310,29 +322,43 @@ export function MyPageScreen({ navigation }: any) {
               isPremium ? styles.planPillTextPremium : styles.planPillTextBasic,
             ]}
           >
-            {isPremium ? '★ Premium member' : 'Free plan'}
+            {isTrialing
+              ? `★ Free trial · ${trialDaysLeft ?? 0}d left`
+              : isPremium
+                ? '★ Premium member'
+                : 'Free plan'}
           </Text>
         </View>
       </View>
 
-      {/* Upgrade card — only for non-premium users */}
-      {!isPremium && (
+      {/* Upgrade card — free users, or trials that will lapse without a card */}
+      {(!isPremium || (isTrialing && !hasPaymentMethod)) && (
         <TouchableOpacity
           style={styles.upgradeCard}
           onPress={() => navigation.navigate('Pricing')}
           activeOpacity={0.9}
         >
           <View style={styles.upgradeCardLeft}>
-            <Text style={styles.upgradeCardEyebrow}>UNLOCK</Text>
+            <Text style={styles.upgradeCardEyebrow}>
+              {isTrialing ? 'KEEP PREMIUM' : 'UNLOCK'}
+            </Text>
             <Text style={styles.upgradeCardTitle}>
-              All 5 AI prediction modes
+              {isTrialing
+                ? `Trial ends in ${trialDaysLeft ?? 0} ${trialDaysLeft === 1 ? 'day' : 'days'}`
+                : 'All 5 AI prediction modes'}
             </Text>
             <Text style={styles.upgradeCardSub}>
-              One-time {PREMIUM_PRICE_DISPLAY} • no subscription
+              {isTrialing
+                ? `Add a card to continue at ${PREMIUM_PRICE_DISPLAY}/month`
+                : trialEligible
+                  ? `${PREMIUM_TRIAL_DAYS} days free • no card needed`
+                  : `${PREMIUM_PRICE_DISPLAY}/month • cancel anytime`}
             </Text>
           </View>
           <View style={styles.upgradeCardCta}>
-            <Text style={styles.upgradeCardCtaText}>Upgrade</Text>
+            <Text style={styles.upgradeCardCtaText}>
+              {isTrialing ? 'Add card' : trialEligible ? 'Try free' : 'Upgrade'}
+            </Text>
           </View>
         </TouchableOpacity>
       )}
@@ -464,6 +490,19 @@ export function MyPageScreen({ navigation }: any) {
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.deleteAccountButton}
+        onPress={() => setDeleteConfirmVisible(true)}
+        disabled={deletingAccount}
+        accessibilityRole="button"
+      >
+        {deletingAccount ? (
+          <ActivityIndicator color="#DC2626" />
+        ) : (
+          <Text style={styles.deleteAccountText}>Delete account</Text>
+        )}
       </TouchableOpacity>
 
       <Text style={styles.version}>LottoDream v1.0.0</Text>
@@ -672,6 +711,21 @@ export function MyPageScreen({ navigation }: any) {
         onConfirm={() => {
           setSignOutConfirmVisible(false);
           void performSignOut();
+        }}
+      />
+
+      <AppFeedbackModal
+        visible={deleteConfirmVisible}
+        title="Delete your account?"
+        message="This permanently deletes your profile, saved numbers and collection, and cancels any subscription immediately. This can’t be undone."
+        variant="warning"
+        cancelLabel="Cancel"
+        onCancel={() => setDeleteConfirmVisible(false)}
+        confirmLabel="Delete account"
+        confirmDestructive
+        onConfirm={() => {
+          setDeleteConfirmVisible(false);
+          void performDeleteAccount();
         }}
       />
     </>
@@ -979,6 +1033,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  deleteAccountButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  deleteAccountText: {
+    color: '#DC2626',
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
   version: {
     color: isWebDashboard ? webDash.textSecondary : '#4A5568',

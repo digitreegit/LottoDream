@@ -8,6 +8,7 @@ import {
   LEGAL_ENTITY,
   LEGAL_LAST_UPDATED,
   PREMIUM_PRICE_DISPLAY,
+  PREMIUM_TRIAL_DAYS,
   SUPPORT_EMAIL,
 } from '../config/constants';
 
@@ -98,32 +99,41 @@ export function TermsOfServiceScreen({ navigation }: any) {
           been compromised or used fraudulently.
         </Text>
 
-        <Text style={styles.h2}>5. Premium unlock & payments</Text>
+        <Text style={styles.h2}>5. Premium subscription, free trial & payments</Text>
         <Text style={styles.p}>
           {LEGAL_ENTITY} offers a free tier (Pure Random and basic features) and a
-          one-time Premium unlock ({PREMIUM_PRICE_DISPLAY} USD, or the equivalent local
-          price shown at checkout) that enables additional prediction modes and
-          personalization features. The Premium unlock is a one-time, non-recurring
-          purchase; it is not a subscription. Prices, taxes, and available payment
-          methods may vary by region and may change with notice.
+          Premium subscription ({PREMIUM_PRICE_DISPLAY} USD per month, or the price shown
+          at checkout) that enables additional prediction modes, analytics and
+          personalization features. Prices, taxes, and available payment methods may
+          vary by region and may change with notice.
         </Text>
         <Text style={styles.p}>
-          Purchases on the web are processed by Stripe, Inc. In-app purchases on iOS
-          and Android, when offered, are processed by Apple and Google respectively
-          and are governed by their payment terms. You authorize the applicable
-          processor to charge your selected payment method for the amount displayed at
-          checkout.
+          Free trial. Each account may start one {PREMIUM_TRIAL_DAYS}-day free trial of
+          Premium. No payment method is required to start it. If you add a payment
+          method during the trial, your subscription automatically begins when the
+          trial ends and you will be charged the monthly price. If you do not add one,
+          the trial ends and your account returns to the free tier without charge.
+        </Text>
+        <Text style={styles.p}>
+          Auto-renewal. A paid subscription renews automatically each month and your
+          payment method is charged at the start of each billing period until you
+          cancel. You can cancel at any time from Pricing → Manage subscription; you
+          keep Premium until the end of the current billing period and are not charged
+          again.
+        </Text>
+        <Text style={styles.p}>
+          Payments are processed by Stripe, Inc. on the web and in our mobile apps. You
+          authorize Stripe to charge your selected payment method for the amounts
+          described above.
         </Text>
 
         <Text style={styles.h2}>6. Refunds</Text>
         <Text style={styles.p}>
-          Because Premium features are digital content delivered immediately on
-          purchase, sales are generally final. Refunds for app-store purchases are
-          handled exclusively by Apple or Google per their refund policies. For web
-          purchases, you may request a refund within 14 days of purchase by emailing{' '}
-          {SUPPORT_EMAIL}; we will review your request in good faith. Nothing in this
-          section limits any non-waivable consumer rights you have under the laws of
-          your jurisdiction.
+          Subscription fees are generally non-refundable for partial billing periods.
+          If you believe you were charged in error, or you request a refund within 14
+          days of a charge, email {SUPPORT_EMAIL} and we will review your request in
+          good faith. Nothing in this section limits any non-waivable consumer rights
+          you have under the laws of your jurisdiction.
         </Text>
 
         <Text style={styles.h2}>7. Acceptable use</Text>

@@ -4,6 +4,18 @@
 // ============================================
 import { Platform } from 'react-native';
 
+// Native builds open Stripe Checkout / Billing Portal in an in-app browser.
+// Stripe can only return to https URLs, so it lands here with
+// `app_return=1`; hand the result back to the app via its URL scheme, which
+// also closes the in-app browser session (see paymentService.openStripeUrl).
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('app_return') === '1') {
+    params.delete('app_return');
+    window.location.replace(`lottodream://billing?${params.toString()}`);
+  }
+}
+
 // Inject Rubik font global styles for web
 if (Platform.OS === 'web') {
   const style = document.createElement('style');

@@ -187,6 +187,10 @@ export interface UserProfile {
   trial_end?: string | null;
   /** Whether the subscription will cancel at period end. */
   cancel_at_period_end?: boolean | null;
+  /** When the account used its one free trial (null = still eligible). */
+  trial_used_at?: string | null;
+  /** Whether a card is on file, i.e. the trial will convert to paid. */
+  has_payment_method?: boolean | null;
 }
 
 export type SubscriptionTier = 'basic' | 'premium';

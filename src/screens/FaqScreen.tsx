@@ -33,7 +33,11 @@ const CATEGORIES: Category[] = [
     items: [
       {
         q: `How does the ${PREMIUM_TRIAL_DAYS}-day free trial work?`,
-        a: `You get full Premium access free for ${PREMIUM_TRIAL_DAYS} days. If you don't cancel before the trial ends, your card is charged ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD}. Manage or cancel anytime from Pricing → Manage subscription.`,
+        a: `Tap “Start free trial” on Pricing — no credit card needed — and every Premium feature unlocks for ${PREMIUM_TRIAL_DAYS} days. Add a card anytime to continue at ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD} after the trial. If you don't, you simply return to Free; you're never charged by surprise. One free trial per account.`,
+      },
+      {
+        q: 'Can I use Premium on web, iPhone and Android?',
+        a: 'Yes. Your plan is tied to your LottoDream account, so a subscription started anywhere unlocks Premium everywhere you sign in.',
       },
       {
         q: 'How do I cancel?',

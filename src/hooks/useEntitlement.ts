@@ -10,7 +10,7 @@
 // promptly.
 //
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode, createElement } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { supabase } from '../config/supabase';
 import { getProfile } from '../services/authService';
 import { UserProfile } from '../types';
@@ -29,6 +29,14 @@ interface EntitlementState {
   currentPeriodEnd: string | null;
   /** Whether the subscription is set to cancel at period end. */
   cancelAtPeriodEnd: boolean;
+  /** Account hasn't used its one free trial yet. */
+  trialEligible: boolean;
+  /** A card is on file, so the trial converts to paid automatically. */
+  hasPaymentMethod: boolean;
+  /** Whole days left in the trial (rounded up), when trialing. */
+  trialDaysLeft: number | null;
+  /** Payment failed; Premium is paused until the card is fixed. */
+  isPastDue: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -41,6 +49,10 @@ const EntitlementContext = createContext<EntitlementState>({
   trialEnd: null,
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
+  trialEligible: false,
+  hasPaymentMethod: false,
+  trialDaysLeft: null,
+  isPastDue: false,
   loading: false,
   refresh: async () => undefined,
 });
@@ -109,20 +121,39 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [load]);
 
+  // Native: refresh when the app returns to the foreground.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void load();
+    });
+    return () => sub.remove();
+  }, [load]);
+
   const status = profile?.subscription_status ?? null;
   const isPremium =
     profile?.subscription_tier === 'premium' ||
     status === 'active' ||
     status === 'trialing';
 
+  const trialEnd = profile?.trial_end ?? null;
+  const trialDaysLeft =
+    status === 'trialing' && trialEnd
+      ? Math.max(0, Math.ceil((new Date(trialEnd).getTime() - Date.now()) / 86_400_000))
+      : null;
+
   const value: EntitlementState = {
     profile,
     isPremium,
     isTrialing: status === 'trialing',
     status,
-    trialEnd: profile?.trial_end ?? null,
+    trialEnd,
     currentPeriodEnd: profile?.current_period_end ?? null,
     cancelAtPeriodEnd: Boolean(profile?.cancel_at_period_end),
+    trialEligible: Boolean(profile) && !profile?.trial_used_at && !status,
+    hasPaymentMethod: Boolean(profile?.has_payment_method),
+    trialDaysLeft,
+    isPastDue: status === 'past_due' || status === 'unpaid',
     loading,
     refresh: load,
   };

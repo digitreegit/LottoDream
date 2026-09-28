@@ -357,7 +357,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         <Text style={styles.pricingSub}>
           Pure Random stays free forever. Start a {PREMIUM_TRIAL_DAYS}-day free trial to unlock
           all AI modes, Today's Fortune lucky numbers & win-quality visualizations — then{' '}
-          {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}. Cancel anytime.
+          {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}. No credit card required to start.
         </Text>
 
         <View

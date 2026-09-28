@@ -230,7 +230,21 @@ export const PREMIUM_CURRENCY = 'USD';
 /** Formatted price used in marketing copy and CTAs. */
 export const PREMIUM_PRICE_DISPLAY = '$4.99';
 export const PREMIUM_PRICE_PERIOD = '/month';
-export const PREMIUM_TRIAL_DAYS = 7;
+/** No-card free trial length. Keep in sync with the PREMIUM_TRIAL_DAYS function secret. */
+export const PREMIUM_TRIAL_DAYS = 14;
+
+/** Deep-link scheme (app.json `scheme`); Stripe returns to `${APP_SCHEME}://billing`. */
+export const APP_SCHEME = 'lottodream';
+
+/**
+ * How iOS builds handle purchases:
+ *   'external' – open Stripe Checkout in an in-app browser (US storefront
+ *                external-purchase links).
+ *   'web_only' – hide all purchase/trial CTAs on iOS; users subscribe on the
+ *                web and their plan syncs. Flip this if App Review objects.
+ */
+export const IOS_PURCHASE_MODE: 'external' | 'web_only' =
+  process.env.EXPO_PUBLIC_IOS_PURCHASE_MODE === 'web_only' ? 'web_only' : 'external';
 
 /**
  * Stripe Price ID for the recurring monthly subscription. Created in the Stripe
@@ -260,4 +274,4 @@ export const LEGAL_ENTITY = 'LottoDream';
 export const APP_DOMAIN = 'lottodream.net';
 
 /** Used for "Last updated" on policy docs — single source of truth. */
-export const LEGAL_LAST_UPDATED = 'June 24, 2026';
+export const LEGAL_LAST_UPDATED = 'September 28, 2026';
