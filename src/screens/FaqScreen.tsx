@@ -10,6 +10,8 @@ import {
   PREMIUM_PRICE_DISPLAY,
   PREMIUM_PRICE_PERIOD,
   PREMIUM_TRIAL_DAYS,
+  PREMIUM_YEARLY_PRICE_DISPLAY,
+  PREMIUM_YEARLY_PRICE_PERIOD,
 } from '../config/constants';
 
 const W = isWebDashboard;
@@ -33,19 +35,19 @@ const CATEGORIES: Category[] = [
     items: [
       {
         q: `How does the ${PREMIUM_TRIAL_DAYS}-day free trial work?`,
-        a: `You get full Premium access free for ${PREMIUM_TRIAL_DAYS} days. If you don't cancel before the trial ends, your card is charged ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD}. Manage or cancel anytime from Pricing → Manage subscription.`,
+        a: `New members get full Premium access free for ${PREMIUM_TRIAL_DAYS} days (one trial per account). If you don't cancel before the trial ends, you're charged for the plan you picked — ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD} or ${PREMIUM_YEARLY_PRICE_DISPLAY}${PREMIUM_YEARLY_PRICE_PERIOD}. Manage or cancel anytime from Pricing → Manage subscription.`,
       },
       {
         q: 'How do I cancel?',
-        a: 'Open Pricing → Manage subscription to reach the secure Stripe billing portal. Cancel in a couple of clicks; you keep Premium until the end of the current period.',
+        a: 'Subscribed on the web? Open Pricing → Manage subscription to reach the secure Stripe billing portal. Subscribed in the app? Cancel in your App Store (Settings → Apple ID → Subscriptions) or Google Play (Payments & subscriptions) account. Either way you keep Premium until the end of the current period.',
       },
       {
         q: 'How do I get a refund?',
-        a: `Subscriptions are billed monthly. If you were charged in error, email ${SUPPORT_EMAIL} and we'll help. Cancel before your renewal date to avoid the next charge.`,
+        a: `Web subscriptions: if you were charged in error, email ${SUPPORT_EMAIL} and we'll help. App Store and Google Play purchases are refunded by Apple or Google under their policies. Cancel before your renewal date to avoid the next charge.`,
       },
       {
         q: 'What payment methods are accepted?',
-        a: 'All major credit and debit cards via Stripe, our secure payment processor. We never see or store your full card number.',
+        a: 'On the web: all major credit and debit cards via Stripe, our secure payment processor. In the iOS and Android apps: your Apple ID or Google Play payment method. We never see or store your full card number.',
       },
     ],
   },

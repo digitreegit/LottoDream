@@ -7,25 +7,14 @@
 //   supabase functions deploy stripe-webhook --no-verify-jwt
 //
 // Secrets:
-//   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SUPABASE_URL,
-//   SUPABASE_SERVICE_ROLE_KEY
+//   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTHLY,
+//   STRIPE_PRICE_YEARLY (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected)
 // ============================================================
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { admin, refreshEntitlement } from "../_shared/supabase.ts";
+import { planForPrice, Stripe, stripe } from "../_shared/stripe.ts";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
-  apiVersion: "2024-06-20",
-  httpClient: Stripe.createFetchHttpClient(),
-});
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
-
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-);
-
-const PREMIUM_STATUSES = new Set(["trialing", "active"]);
 
 function toIso(seconds: number | null | undefined): string | null {
   return seconds ? new Date(seconds * 1000).toISOString() : null;
@@ -44,47 +33,39 @@ async function resolveUserId(
   return (data?.id as string) ?? null;
 }
 
-async function syncSubscription(sub: Stripe.Subscription) {
+// Events can arrive out of order, so always re-read the subscription from
+// Stripe and store its current state rather than the event snapshot.
+async function syncSubscription(subscriptionId: string) {
+  const sub = await stripe.subscriptions.retrieve(subscriptionId);
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
   const userId = await resolveUserId(customerId, sub.metadata?.supabase_user_id);
   if (!userId) return;
 
-  const status = sub.status;
   const priceId = sub.items.data[0]?.price?.id ?? null;
-  const currentPeriodEnd = toIso(sub.current_period_end);
-  const trialEnd = toIso(sub.trial_end);
-  const cancelAtPeriodEnd = sub.cancel_at_period_end ?? false;
-  const isPremium = PREMIUM_STATUSES.has(status);
+  const plan = planForPrice(priceId) ??
+    (sub.items.data[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly");
 
-  await admin.from("subscriptions").upsert(
+  const { error } = await admin.from("subscriptions").upsert(
     {
       user_id: userId,
+      provider: "stripe",
+      provider_subscription_id: sub.id,
       stripe_customer_id: customerId,
       stripe_subscription_id: sub.id,
-      status,
+      status: sub.status,
+      plan,
       price_id: priceId,
-      current_period_end: currentPeriodEnd,
-      trial_end: trialEnd,
-      cancel_at_period_end: cancelAtPeriodEnd,
+      current_period_end: toIso(sub.current_period_end),
+      trial_end: toIso(sub.trial_end),
+      cancel_at_period_end: sub.cancel_at_period_end ?? false,
       raw_payload: sub as unknown as Record<string, unknown>,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "stripe_subscription_id" },
+    { onConflict: "provider,provider_subscription_id" },
   );
+  if (error) throw new Error(`subscriptions upsert failed: ${error.message}`);
 
-  await admin
-    .from("profiles")
-    .update({
-      subscription_tier: isPremium ? "premium" : "basic",
-      subscription_status: status,
-      premium_source: "stripe",
-      premium_since: isPremium ? new Date().toISOString() : null,
-      stripe_customer_id: customerId,
-      current_period_end: currentPeriodEnd,
-      trial_end: trialEnd,
-      cancel_at_period_end: cancelAtPeriodEnd,
-    })
-    .eq("id", userId);
+  await refreshEntitlement(userId);
 }
 
 Deno.serve(async (req) => {
@@ -111,34 +92,28 @@ Deno.serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        if (session.subscription) {
-          const sub = await stripe.subscriptions.retrieve(
-            session.subscription as string,
-          );
-          await syncSubscription(sub);
-        }
+        if (session.subscription) await syncSubscription(session.subscription as string);
         break;
       }
       case "customer.subscription.created":
       case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
-        await syncSubscription(event.data.object as Stripe.Subscription);
+      case "customer.subscription.deleted":
+      case "customer.subscription.paused":
+      case "customer.subscription.resumed": {
+        await syncSubscription((event.data.object as Stripe.Subscription).id);
         break;
       }
+      case "invoice.paid":
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        if (invoice.subscription) {
-          const sub = await stripe.subscriptions.retrieve(
-            invoice.subscription as string,
-          );
-          await syncSubscription(sub);
-        }
+        if (invoice.subscription) await syncSubscription(invoice.subscription as string);
         break;
       }
       default:
         break;
     }
   } catch (err) {
+    // 500 makes Stripe retry the event.
     return new Response(`Handler error: ${(err as Error).message}`, { status: 500 });
   }
 

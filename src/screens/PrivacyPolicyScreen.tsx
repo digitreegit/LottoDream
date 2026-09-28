@@ -4,7 +4,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { LEGAL_ENTITY, LEGAL_LAST_UPDATED, SUPPORT_EMAIL } from '../config/constants';
+import {
+  LEGAL_ENTITY,
+  LEGAL_LAST_UPDATED,
+  PREMIUM_TRIAL_DAYS,
+  SUPPORT_EMAIL,
+} from '../config/constants';
 
 const BACK_CHEVRON_COLOR = '#00A383';
 
@@ -70,12 +75,15 @@ export function PrivacyPolicyScreen({ navigation }: any) {
           when you leave the page. We do not store your birthdate.
         </Text>
         <Text style={styles.p}>
-          <Text style={styles.strong}>Payment data.</Text> When you subscribe to Premium
-          ({'$'}4.99/month with a {String(7)}-day free trial), your card number and CVC are
-          entered directly into our payment processor (Stripe) and are never sent to our
-          servers. We receive a transaction ID, the last four digits of your card, the
-          amount, the subscription status, and renewal dates for accounting and receipt
-          purposes.
+          <Text style={styles.strong}>Payment data.</Text> When you subscribe to Premium on
+          the web (including the {PREMIUM_TRIAL_DAYS}-day free trial), your card details
+          are entered directly into our payment processor (Stripe) and are never sent to
+          our servers. When you subscribe in the iOS or Android app, Apple or Google
+          processes the payment and we never receive your payment details. In both cases
+          we receive the subscription status, plan, and renewal dates (and, for web
+          purchases, a transaction ID and card last four digits) for entitlement,
+          accounting, and receipt purposes. App purchases are routed through our
+          subscription-management provider, RevenueCat, using your account ID only.
         </Text>
         <Text style={styles.p}>
           <Text style={styles.strong}>Device & usage data.</Text> IP address, device and
@@ -115,8 +123,10 @@ export function PrivacyPolicyScreen({ navigation }: any) {
           authentication, and infrastructure.{'\n'}
           • <Text style={styles.strong}>Stripe, Inc.</Text> — web payments and receipts.
           {'\n'}
-          • <Text style={styles.strong}>Apple / Google</Text> — in-app purchases (when
-          offered).{'\n'}
+          • <Text style={styles.strong}>Apple / Google</Text> — in-app subscriptions.
+          {'\n'}
+          • <Text style={styles.strong}>RevenueCat, Inc.</Text> — in-app subscription
+          status, keyed to your account ID.{'\n'}
           • <Text style={styles.strong}>NY Open Data / state lottery sources</Text> — we
           consume public draw data; we do not share your account data with them.{'\n'}
           • <Text style={styles.strong}>Law-enforcement or regulators</Text> — if we are

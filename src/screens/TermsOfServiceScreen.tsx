@@ -8,6 +8,10 @@ import {
   LEGAL_ENTITY,
   LEGAL_LAST_UPDATED,
   PREMIUM_PRICE_DISPLAY,
+  PREMIUM_PRICE_PERIOD,
+  PREMIUM_YEARLY_PRICE_DISPLAY,
+  PREMIUM_YEARLY_PRICE_PERIOD,
+  PREMIUM_TRIAL_DAYS,
   SUPPORT_EMAIL,
 } from '../config/constants';
 
@@ -98,29 +102,45 @@ export function TermsOfServiceScreen({ navigation }: any) {
           been compromised or used fraudulently.
         </Text>
 
-        <Text style={styles.h2}>5. Premium unlock & payments</Text>
+        <Text style={styles.h2}>5. Premium subscription & payments</Text>
         <Text style={styles.p}>
-          {LEGAL_ENTITY} offers a free tier (Pure Random and basic features) and a
-          one-time Premium unlock ({PREMIUM_PRICE_DISPLAY} USD, or the equivalent local
-          price shown at checkout) that enables additional prediction modes and
-          personalization features. The Premium unlock is a one-time, non-recurring
-          purchase; it is not a subscription. Prices, taxes, and available payment
-          methods may vary by region and may change with notice.
+          {LEGAL_ENTITY} offers a free tier (Pure Random and basic features) and an
+          auto-renewing Premium subscription, billed monthly ({PREMIUM_PRICE_DISPLAY}
+          {PREMIUM_PRICE_PERIOD}) or yearly ({PREMIUM_YEARLY_PRICE_DISPLAY}
+          {PREMIUM_YEARLY_PRICE_PERIOD}) in USD, plus applicable taxes. The Service and
+          Premium are offered to users in the United States. Prices may change with
+          advance notice; changes apply from your next renewal.
         </Text>
         <Text style={styles.p}>
-          Purchases on the web are processed by Stripe, Inc. In-app purchases on iOS
-          and Android, when offered, are processed by Apple and Google respectively
-          and are governed by their payment terms. You authorize the applicable
-          processor to charge your selected payment method for the amount displayed at
-          checkout.
+          Free trial. First-time subscribers may receive a {PREMIUM_TRIAL_DAYS}-day free
+          trial, limited to one trial per account. A valid payment method is required to
+          start the trial. Unless you cancel before the trial ends, your subscription
+          starts automatically and you are charged the price of the plan you selected.
+        </Text>
+        <Text style={styles.p}>
+          Automatic renewal. Your subscription renews automatically at the end of each
+          billing period at the then-current price until you cancel. You can cancel at any
+          time; cancellation takes effect at the end of the current billing period and you
+          keep Premium until then.
+        </Text>
+        <Text style={styles.p}>
+          Web subscriptions are processed by Stripe, Inc. and can be managed or cancelled
+          from Pricing → Manage subscription. Subscriptions purchased in the iOS or Android
+          app are processed by Apple or Google, charged to your Apple ID or Google Play
+          account, and must be managed or cancelled in your App Store or Google Play
+          account settings at least 24 hours before the end of the current period. Your use
+          of the iOS app is also subject to Apple's Standard Licensed Application End User
+          License Agreement. Deleting your {LEGAL_ENTITY} account cancels web subscriptions
+          but does not cancel App Store or Google Play subscriptions.
         </Text>
 
         <Text style={styles.h2}>6. Refunds</Text>
         <Text style={styles.p}>
-          Because Premium features are digital content delivered immediately on
-          purchase, sales are generally final. Refunds for app-store purchases are
-          handled exclusively by Apple or Google per their refund policies. For web
-          purchases, you may request a refund within 14 days of purchase by emailing{' '}
+          Because Premium features are digital content delivered immediately, charges
+          are generally non-refundable, including for partial billing periods. Refunds for
+          App Store and Google Play purchases are handled exclusively by Apple or Google
+          per their refund policies. For web subscriptions, you may request a refund
+          within 14 days of a charge by emailing{' '}
           {SUPPORT_EMAIL}; we will review your request in good faith. Nothing in this
           section limits any non-waivable consumer rights you have under the laws of
           your jurisdiction.

@@ -18,10 +18,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lottodream.app",
       "buildNumber": "1",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app doesn't use location services.",
-        "NSCameraUsageDescription": "This app doesn't use camera.",
-        "NSMicrophoneUsageDescription": "This app doesn't use microphone."
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -35,7 +33,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
@@ -43,9 +42,8 @@
       "bundlingEngine": "metro"
     },
     "plugins": [
-      [
-        "expo-secure-store"
-      ]
+      "expo-secure-store",
+      "expo-dev-client"
     ]
   }
 }

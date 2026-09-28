@@ -1,7 +1,7 @@
 // ============================================
 // Pricing Screen – Free vs Premium comparison + CTAs
 // ============================================
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,20 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
-import { startPremiumCheckout, openBillingPortal } from '../services/paymentService';
+import {
+  startPremiumCheckout,
+  openBillingPortal,
+  restorePurchases,
+  type BillingPlan,
+} from '../services/paymentService';
+import { iapGetOffers } from '../services/iap';
+import type { IapOffer } from '../services/iapTypes';
 import {
   PREMIUM_PRICE_DISPLAY,
   PREMIUM_PRICE_PERIOD,
+  PREMIUM_YEARLY_PRICE_DISPLAY,
+  PREMIUM_YEARLY_PRICE_PERIOD,
+  PREMIUM_YEARLY_SAVINGS_PCT,
   PREMIUM_TRIAL_DAYS,
   PREMIUM_CURRENCY,
   SUPPORT_EMAIL,
@@ -123,16 +133,55 @@ interface Props {
   navigation?: any;
 }
 
+const isWeb = Platform.OS === 'web';
+
+const DEFAULT_PRICES: Record<BillingPlan, { price: string; period: string }> = {
+  monthly: { price: PREMIUM_PRICE_DISPLAY, period: PREMIUM_PRICE_PERIOD },
+  yearly: { price: PREMIUM_YEARLY_PRICE_DISPLAY, period: PREMIUM_YEARLY_PRICE_PERIOD },
+};
+
 export function PricingScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const { isPremium, isTrialing, cancelAtPeriodEnd, currentPeriodEnd, refresh } = useEntitlement();
+  const {
+    isPremium,
+    isTrialing,
+    cancelAtPeriodEnd,
+    currentPeriodEnd,
+    source,
+    plan: activePlan,
+    trialEligible,
+    refresh,
+  } = useEntitlement();
+  const [plan, setPlan] = useState<BillingPlan>('yearly');
+  const [storeOffers, setStoreOffers] = useState<IapOffer[]>([]);
   const [checkoutStatus, setCheckoutStatus] = useState<
-    null | 'loading' | 'redirected' | 'portal' | 'error'
+    null | 'loading' | 'redirected' | 'portal' | 'restoring' | 'error'
   >(null);
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
   const isWide = width >= 720;
+
+  // In the apps, show the store's own localized price and trial eligibility.
+  useEffect(() => {
+    if (isWeb) return;
+    void iapGetOffers().then(setStoreOffers);
+  }, [user]);
+
+  const storeOffer = storeOffers.find((o) => o.plan === plan);
+  const price = storeOffer?.priceString ?? DEFAULT_PRICES[plan].price;
+  const period = DEFAULT_PRICES[plan].period;
+  const trialDays = isWeb
+    ? trialEligible
+      ? PREMIUM_TRIAL_DAYS
+      : null
+    : storeOffer
+      ? storeOffer.trialDays
+      : trialEligible
+        ? PREMIUM_TRIAL_DAYS
+        : null;
+  const [priceWhole, priceCents] = price.replace(/^[^0-9]*/, '').split('.');
+  const currencySymbol = price.match(/^[^0-9]*/)?.[0] || '$';
 
   const handleUpgrade = async () => {
     if (!user) {
@@ -141,11 +190,16 @@ export function PricingScreen({ navigation }: Props) {
     }
     setCheckoutStatus('loading');
     setCheckoutMsg(null);
-    const outcome = await startPremiumCheckout();
+    const outcome = await startPremiumCheckout(plan);
     if (outcome.status === 'redirected') {
       setCheckoutStatus('redirected');
       setCheckoutMsg('Redirecting you to secure Stripe checkout…');
+    } else if (outcome.status === 'purchased') {
+      setCheckoutStatus(null);
+      setCheckoutMsg('Welcome to Premium! 🎉');
       void refresh();
+    } else if (outcome.status === 'cancelled') {
+      setCheckoutStatus(null);
     } else {
       setCheckoutStatus('error');
       setCheckoutMsg(outcome.reason);
@@ -155,12 +209,33 @@ export function PricingScreen({ navigation }: Props) {
   const handleManage = async () => {
     setCheckoutStatus('portal');
     setCheckoutMsg(null);
-    const outcome = await openBillingPortal();
-    if (outcome.status !== 'redirected') {
+    const outcome = await openBillingPortal(source);
+    if (outcome.status === 'error') {
       setCheckoutStatus('error');
       setCheckoutMsg(outcome.reason);
+    } else if (outcome.status !== 'redirected') {
+      setCheckoutStatus(null);
     }
   };
+
+  const handleRestore = async () => {
+    setCheckoutStatus('restoring');
+    setCheckoutMsg(null);
+    const outcome = await restorePurchases();
+    if (outcome.status === 'purchased') {
+      setCheckoutStatus(null);
+      setCheckoutMsg('Purchases restored — Premium is active.');
+      void refresh();
+    } else {
+      setCheckoutStatus('error');
+      setCheckoutMsg(outcome.status === 'error' ? outcome.reason : 'Restore cancelled.');
+    }
+  };
+
+  const renewalText = (planPrice: string, planPeriod: string) =>
+    trialDays
+      ? `${trialDays}-day free trial, then ${planPrice}${planPeriod}`
+      : `${planPrice}${planPeriod}`;
 
   const formatDate = (iso: string | null) =>
     iso
@@ -178,10 +253,11 @@ export function PricingScreen({ navigation }: Props) {
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>Pricing</Text>
         <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]}>
-          Try free for {PREMIUM_TRIAL_DAYS} days.{'\n'}Then {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD}.
+          Try free for {PREMIUM_TRIAL_DAYS} days.{'\n'}Then {PREMIUM_PRICE_DISPLAY}{PREMIUM_PRICE_PERIOD} or{' '}
+          {PREMIUM_YEARLY_PRICE_DISPLAY}{PREMIUM_YEARLY_PRICE_PERIOD}.
         </Text>
         <Text style={styles.heroSub}>
-          Start your {PREMIUM_TRIAL_DAYS}-day free trial — every AI mode, today's fortune
+          New members get a {PREMIUM_TRIAL_DAYS}-day free trial — every AI mode, today's fortune
           lucky numbers, deeper analytics, and all six lottery games. Cancel anytime.
         </Text>
       </View>
@@ -218,19 +294,41 @@ export function PricingScreen({ navigation }: Props) {
         {/* Premium plan */}
         <View style={[styles.planCard, styles.planCardFeatured, isWide && styles.planCardWide]}>
           <View style={styles.featuredBadge}>
-            <Text style={styles.featuredBadgeText}>Best value</Text>
-          </View>
-          <Text style={[styles.planName, styles.planNameOnFeatured]}>Premium</Text>
-          <View style={styles.priceRow}>
-            <Text style={[styles.priceCurrency, styles.priceOnFeatured]}>$</Text>
-            <Text style={[styles.priceAmount, styles.priceOnFeatured]}>4.99</Text>
-            <Text style={[styles.priceUnit, styles.priceOnFeatured]}>
-              {PREMIUM_PRICE_PERIOD}
+            <Text style={styles.featuredBadgeText}>
+              {trialDays ? `${trialDays} days free` : 'Best value'}
             </Text>
           </View>
+          <Text style={[styles.planName, styles.planNameOnFeatured]}>Premium</Text>
+
+          {!isPremium ? (
+            <View style={styles.planToggle} accessibilityRole="radiogroup">
+              {(['monthly', 'yearly'] as const).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.planToggleOption, plan === p && styles.planToggleOptionActive]}
+                  onPress={() => setPlan(p)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: plan === p }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.planToggleText, plan === p && styles.planToggleTextActive]}>
+                    {p === 'monthly' ? 'Monthly' : `Yearly · save ${PREMIUM_YEARLY_SAVINGS_PCT}%`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.priceRow}>
+            <Text style={[styles.priceCurrency, styles.priceOnFeatured]}>{currencySymbol}</Text>
+            <Text style={[styles.priceAmount, styles.priceOnFeatured]}>
+              {priceCents ? `${priceWhole}.${priceCents}` : priceWhole}
+            </Text>
+            <Text style={[styles.priceUnit, styles.priceOnFeatured]}>{period}</Text>
+          </View>
           <Text style={[styles.planSub, styles.planSubOnFeatured]}>
-            {PREMIUM_TRIAL_DAYS}-day free trial, then {PREMIUM_PRICE_DISPLAY}/month. Every AI mode,
-            today's fortune, deeper analytics, and unlimited saved sets. Cancel anytime.
+            {renewalText(price, period)}. Every AI mode, today's fortune, deeper analytics,
+            and unlimited saved sets. Cancel anytime.
           </Text>
           <View style={styles.planBullets}>
             <Bullet
@@ -255,7 +353,7 @@ export function PricingScreen({ navigation }: Props) {
                   {cancelAtPeriodEnd
                     ? `Cancels on ${formatDate(currentPeriodEnd)}.`
                     : isTrialing
-                      ? `Trial ends ${formatDate(currentPeriodEnd)}, then ${PREMIUM_PRICE_DISPLAY}/mo.`
+                      ? `Trial ends ${formatDate(currentPeriodEnd)}, then ${DEFAULT_PRICES[activePlan ?? 'monthly'].price}${DEFAULT_PRICES[activePlan ?? 'monthly'].period}.`
                       : `Renews ${formatDate(currentPeriodEnd)}.`}
                 </Text>
               ) : null}
@@ -287,7 +385,13 @@ export function PricingScreen({ navigation }: Props) {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.planCtaPrimaryText}>
-                  {user ? `Start ${PREMIUM_TRIAL_DAYS}-day free trial` : 'Sign in to start free trial'}
+                  {!user
+                    ? trialDays
+                      ? 'Sign in to start free trial'
+                      : 'Sign in to subscribe'
+                    : trialDays
+                      ? `Start ${trialDays}-day free trial`
+                      : `Subscribe — ${price}${period}`}
                 </Text>
               )}
             </TouchableOpacity>
@@ -304,9 +408,33 @@ export function PricingScreen({ navigation }: Props) {
             </Text>
           ) : null}
 
+          {!isWeb && !isPremium ? (
+            <TouchableOpacity
+              onPress={handleRestore}
+              disabled={checkoutStatus === 'restoring'}
+              style={styles.restoreBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.restoreText}>
+                {checkoutStatus === 'restoring' ? 'Restoring…' : 'Restore purchases'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           <Text style={styles.fineprint}>
-            {`Secure checkout & billing via Stripe. ${PREMIUM_TRIAL_DAYS}-day free trial, then ${PREMIUM_PRICE_DISPLAY}/month in ${PREMIUM_CURRENCY}. Cancel anytime; taxes may apply.`}
+            {isWeb
+              ? `Secure checkout & billing via Stripe. ${renewalText(price, period)} in ${PREMIUM_CURRENCY}. Your card is charged automatically when the trial ends unless you cancel. Cancel anytime; taxes may apply.`
+              : `${renewalText(price, period)}. Payment is charged to your ${Platform.OS === 'ios' ? 'Apple ID' : 'Google Play'} account at confirmation of purchase${trialDays ? ' (after the free trial ends)' : ''}. The subscription renews automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel in your ${Platform.OS === 'ios' ? 'App Store account settings' : 'Google Play subscriptions'}.`}
           </Text>
+          <View style={styles.legalLinks}>
+            <Text style={styles.legalLink} onPress={() => navigation?.navigate?.('TermsOfService')}>
+              Terms of Use
+            </Text>
+            <Text style={styles.fineprintDot}>·</Text>
+            <Text style={styles.legalLink} onPress={() => navigation?.navigate?.('PrivacyPolicy')}>
+              Privacy Policy
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -341,7 +469,7 @@ export function PricingScreen({ navigation }: Props) {
         <Text style={styles.faqTitle}>Questions, answered</Text>
         <Faq
           q={`How does the ${PREMIUM_TRIAL_DAYS}-day free trial work?`}
-          a={`You get full Premium access free for ${PREMIUM_TRIAL_DAYS} days. If you don't cancel before the trial ends, your card is charged ${PREMIUM_PRICE_DISPLAY}/month. You can cancel anytime from "Manage subscription".`}
+          a={`New members get full Premium access free for ${PREMIUM_TRIAL_DAYS} days (one trial per account). If you don't cancel before the trial ends, you're charged for the plan you picked — ${PREMIUM_PRICE_DISPLAY}${PREMIUM_PRICE_PERIOD} or ${PREMIUM_YEARLY_PRICE_DISPLAY}${PREMIUM_YEARLY_PRICE_PERIOD}. You can cancel anytime from "Manage subscription".`}
         />
         <Faq
           q="Can I cancel anytime?"
@@ -357,7 +485,7 @@ export function PricingScreen({ navigation }: Props) {
         />
         <Faq
           q="How do I get a refund?"
-          a={`Subscriptions are billed monthly via Stripe. If you were charged in error, contact ${SUPPORT_EMAIL} and we'll help. Cancel before your renewal date to avoid the next charge.`}
+          a={`Web subscriptions are billed via Stripe — if you were charged in error, contact ${SUPPORT_EMAIL} and we'll help. App Store and Google Play purchases are refunded by Apple or Google under their policies. Cancel before your renewal date to avoid the next charge.`}
         />
       </View>
 
@@ -647,6 +775,61 @@ const styles = StyleSheet.create({
   },
   checkoutNoteError: {
     color: '#FCA5A5',
+  },
+  planToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: space.lg,
+  },
+  planToggleOption: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} }),
+  },
+  planToggleOptionActive: {
+    backgroundColor: webDash.accent,
+  },
+  planToggleText: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: FONT_FAMILY,
+  },
+  planToggleTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  restoreBtn: {
+    marginTop: space.md,
+    alignSelf: 'center',
+    paddingVertical: 6,
+  },
+  restoreText: {
+    color: '#9CE5D2',
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    fontFamily: FONT_FAMILY,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: space.sm,
+  },
+  legalLink: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    textDecorationLine: 'underline',
+    fontFamily: FONT_FAMILY,
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} }),
+  },
+  fineprintDot: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
   fineprint: {
     marginTop: space.md,

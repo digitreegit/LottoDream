@@ -1,17 +1,11 @@
 // ============================================================
 // Edge Function: create-billing-portal-session
-// Opens the Stripe Billing Portal so subscribers can manage / cancel.
+// Opens the Stripe Billing Portal so web subscribers can manage / cancel.
+// (App Store / Google Play subscribers manage through their store.)
 // ============================================================
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
-  apiVersion: "2024-06-20",
-  httpClient: Stripe.createFetchHttpClient(),
-});
-
-const APP_URL = (Deno.env.get("APP_URL") ?? "https://lottodream.net").replace(/\/$/, "");
+import { admin, getCaller } from "../_shared/supabase.ts";
+import { APP_URL, stripe } from "../_shared/stripe.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -22,27 +16,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
-    if (userErr || !user) return jsonResponse({ error: "Unauthorized" }, 401);
+    const user = await getCaller(req);
+    if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
     const { data: profile } = await admin
       .from("profiles")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, premium_source")
       .eq("id", user.id)
       .maybeSingle();
+
+    if (profile?.premium_source === "apple" || profile?.premium_source === "google") {
+      const store = profile.premium_source === "apple" ? "App Store" : "Google Play";
+      return jsonResponse(
+        { error: `Your subscription is billed through ${store}. Manage it from the LottoDream app or your ${store} account settings.` },
+        409,
+      );
+    }
 
     const customerId = profile?.stripe_customer_id as string | undefined;
     if (!customerId) return jsonResponse({ error: "No subscription found" }, 404);

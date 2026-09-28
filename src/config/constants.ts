@@ -217,28 +217,24 @@ export function getGameConfig(game: GameType): GameConfig {
 }
 
 // ============================================
-// Monetization — monthly Premium subscription
+// Monetization — Premium subscription (monthly / yearly)
 // ============================================
+// Web bills through Stripe; the iOS / Android apps bill through the App Store
+// and Google Play (RevenueCat). Keep these in sync with the Stripe prices and
+// the store products — the apps show the store's localized price when available.
 
-/** Product identifier used across Stripe. */
-export const PREMIUM_PRODUCT_ID = 'premium_monthly';
-
-/** User-facing price in cents (monthly recurring). */
-export const PREMIUM_PRICE_CENTS = 499;
 export const PREMIUM_CURRENCY = 'USD';
 
-/** Formatted price used in marketing copy and CTAs. */
+/** Formatted prices used in marketing copy and CTAs. */
 export const PREMIUM_PRICE_DISPLAY = '$4.99';
 export const PREMIUM_PRICE_PERIOD = '/month';
-export const PREMIUM_TRIAL_DAYS = 7;
+export const PREMIUM_YEARLY_PRICE_DISPLAY = '$39.99';
+export const PREMIUM_YEARLY_PRICE_PERIOD = '/year';
+/** Yearly savings vs. 12 × monthly, rounded. */
+export const PREMIUM_YEARLY_SAVINGS_PCT = 33;
 
-/**
- * Stripe Price ID for the recurring monthly subscription. Created in the Stripe
- * Dashboard (Products -> recurring monthly price). Consumed by the Supabase
- * Edge Function `create-checkout-session`.
- */
-export const STRIPE_PREMIUM_PRICE_ID =
-  process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '';
+/** First-time subscribers only; one trial per account. */
+export const PREMIUM_TRIAL_DAYS = 14;
 
 /**
  * Supabase Edge Function base. Defaults to `${SUPABASE_URL}/functions/v1`.
@@ -260,4 +256,4 @@ export const LEGAL_ENTITY = 'LottoDream';
 export const APP_DOMAIN = 'lottodream.net';
 
 /** Used for "Last updated" on policy docs — single source of truth. */
-export const LEGAL_LAST_UPDATED = 'June 24, 2026';
+export const LEGAL_LAST_UPDATED = 'September 28, 2026';

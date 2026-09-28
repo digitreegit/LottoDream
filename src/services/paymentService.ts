@@ -1,48 +1,61 @@
 // ============================================
-// Payment Service – monthly Premium subscription (web)
+// Payment Service – Premium subscription (monthly / yearly)
 // ============================================
 //
-// Strategy (web-only):
-//   • `startPremiumCheckout()` calls the Supabase Edge Function
-//     `create-checkout-session`, which returns a Stripe Checkout URL for the
-//     $4.99/mo subscription (7-day free trial). We redirect the current tab.
-//   • A Stripe webhook (`stripe-webhook` Edge Function) flips
-//     `profiles.subscription_tier` to 'premium' for active/trialing subs.
-//   • `openBillingPortal()` calls `create-billing-portal-session` so the user
-//     can manage or cancel their subscription.
+//   • Web: Stripe Checkout via the `create-checkout-session` Edge Function
+//     (free trial for first-time subscribers, card required), managed via the
+//     Stripe Billing Portal.
+//   • iOS / Android: App Store / Google Play in-app purchase through
+//     RevenueCat (see iap.native.ts), managed in the store.
+//   • Both land in `profiles.subscription_tier` via their webhooks
+//     (`stripe-webhook`, `revenuecat-webhook`), read by `useEntitlement`.
 //
+import { Platform } from 'react-native';
 import { supabase } from '../config/supabase';
-import {
-  PREMIUM_PRODUCT_ID,
-  PREMIUM_PRICE_CENTS,
-  PREMIUM_CURRENCY,
-} from '../config/constants';
+import { iapManage, iapPurchase, iapRestore } from './iap';
+import type { BillingPlan } from './iapTypes';
+
+export type { BillingPlan };
 
 export type CheckoutOutcome =
   | { status: 'redirected'; provider: 'stripe' }
+  | { status: 'purchased'; provider: 'iap' }
+  | { status: 'cancelled' }
   | { status: 'error'; reason: string };
 
-async function invokeFunction(name: string): Promise<{ url?: string; error?: string }> {
-  const { data, error } = await supabase.functions.invoke(name, { body: {} });
+const isWeb = Platform.OS === 'web';
+
+async function invokeFunction(
+  name: string,
+  body: Record<string, unknown> = {},
+): Promise<{ url?: string; error?: string }> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
   if (error) {
     // Surface the function's JSON error message when available.
-    const ctxBody = (error as any)?.context?.body;
-    return { error: ctxBody?.error || error.message || 'Request failed.' };
+    const ctx = (error as any)?.context;
+    let message: string | undefined;
+    try {
+      message = typeof ctx?.json === 'function' ? (await ctx.json())?.error : ctx?.body?.error;
+    } catch {
+      message = undefined;
+    }
+    return { error: message || error.message || 'Request failed.' };
   }
   return { url: (data as any)?.url, error: (data as any)?.error };
 }
 
 /**
- * Start the Premium subscription checkout flow. Resolves after redirecting the
- * browser to Stripe Checkout. Entitlement is observed asynchronously via
- * `useEntitlement().refresh()` / realtime profile updates.
+ * Start a Premium subscription. On web this redirects to Stripe Checkout; in
+ * the apps it opens the native App Store / Google Play purchase sheet.
  */
-export async function startPremiumCheckout(): Promise<CheckoutOutcome> {
+export async function startPremiumCheckout(plan: BillingPlan = 'monthly'): Promise<CheckoutOutcome> {
+  if (!isWeb) {
+    const result = await iapPurchase(plan);
+    if (result.status === 'purchased') return { status: 'purchased', provider: 'iap' };
+    return result;
+  }
   try {
-    if (typeof window === 'undefined') {
-      return { status: 'error', reason: 'Checkout is only available on the web.' };
-    }
-    const { url, error } = await invokeFunction('create-checkout-session');
+    const { url, error } = await invokeFunction('create-checkout-session', { plan });
     if (error || !url) {
       return { status: 'error', reason: error || 'Could not start checkout.' };
     }
@@ -53,14 +66,36 @@ export async function startPremiumCheckout(): Promise<CheckoutOutcome> {
   }
 }
 
+/** Restore App Store / Google Play purchases (required by Apple). */
+export async function restorePurchases(): Promise<CheckoutOutcome> {
+  const result = await iapRestore();
+  if (result.status === 'purchased') return { status: 'purchased', provider: 'iap' };
+  return result;
+}
+
 /**
- * Open the Stripe Billing Portal so the user can manage / cancel their plan.
+ * Let the user manage / cancel. `source` is where the subscription was bought
+ * (`profiles.premium_source`); each provider can only be managed in its own place.
  */
-export async function openBillingPortal(): Promise<CheckoutOutcome> {
-  try {
-    if (typeof window === 'undefined') {
-      return { status: 'error', reason: 'Billing portal is only available on the web.' };
+export async function openBillingPortal(source: string | null): Promise<CheckoutOutcome> {
+  if (source === 'apple' || source === 'google') {
+    if (isWeb) {
+      const store = source === 'apple' ? 'App Store' : 'Google Play';
+      return {
+        status: 'error',
+        reason: `Your subscription is billed through ${store}. Manage it in the LottoDream app or your ${store} settings.`,
+      };
     }
+    await iapManage();
+    return { status: 'cancelled' };
+  }
+  if (!isWeb) {
+    return {
+      status: 'error',
+      reason: 'Your subscription was purchased on lottodream.net. Sign in there to manage or cancel it.',
+    };
+  }
+  try {
     const { url, error } = await invokeFunction('create-billing-portal-session');
     if (error || !url) {
       return { status: 'error', reason: error || 'Could not open billing portal.' };
@@ -73,33 +108,13 @@ export async function openBillingPortal(): Promise<CheckoutOutcome> {
 }
 
 /**
- * DEVELOPMENT ONLY. Marks the current user as premium without a real payment.
- * No-op in production builds.
+ * Permanently delete the signed-in account. Cancels any web (Stripe)
+ * subscription; App Store / Google Play subscriptions must be cancelled by the
+ * user in their store settings.
  */
-export async function simulatePremiumGrant(): Promise<{ error: string | null }> {
-  if (!__DEV__) {
-    return { error: 'Disabled outside of development builds.' };
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'Sign in first.' };
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      subscription_tier: 'premium',
-      subscription_status: 'active',
-      premium_since: new Date().toISOString(),
-      premium_source: 'manual',
-    })
-    .eq('id', user.id);
-
-  return { error: error?.message ?? null };
+export async function deleteAccount(): Promise<{ error: string | null }> {
+  const { error } = await invokeFunction('delete-account');
+  if (error) return { error };
+  await supabase.auth.signOut();
+  return { error: null };
 }
-
-export const PREMIUM_CHECKOUT_INFO = {
-  productId: PREMIUM_PRODUCT_ID,
-  amountCents: PREMIUM_PRICE_CENTS,
-  currency: PREMIUM_CURRENCY,
-};

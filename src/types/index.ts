@@ -173,7 +173,7 @@ export interface UserProfile {
   points: number;
   referral_code?: string;
   created_at: string;
-  /** 'basic' (free) or 'premium' ($4.99/mo subscription). Backed by profiles.subscription_tier. */
+  /** 'basic' (free) or 'premium' (monthly/yearly subscription). Backed by profiles.subscription_tier. */
   subscription_tier?: SubscriptionTier;
   /** Timestamp when premium was activated (Stripe webhook / IAP receipt). */
   premium_since?: string | null;
@@ -187,14 +187,19 @@ export interface UserProfile {
   trial_end?: string | null;
   /** Whether the subscription will cancel at period end. */
   cancel_at_period_end?: boolean | null;
+  /** 'monthly' | 'yearly' for the subscription granting access. */
+  subscription_plan?: 'monthly' | 'yearly' | null;
+  /** True once the account has used its one free trial (any platform). */
+  has_used_trial?: boolean | null;
 }
 
 export type SubscriptionTier = 'basic' | 'premium';
 
-export type PremiumSource = 'stripe' | 'apple_iap' | 'google_iap' | 'manual';
+export type PremiumSource = 'stripe' | 'apple' | 'google' | 'manual';
 
-/** Mirrors Stripe subscription.status values we care about. */
+/** Stripe subscription.status values, plus 'expired' for lapsed store subscriptions. */
 export type SubscriptionStatus =
+  | 'expired'
   | 'trialing'
   | 'active'
   | 'past_due'

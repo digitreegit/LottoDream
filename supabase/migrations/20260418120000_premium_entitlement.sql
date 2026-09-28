@@ -52,7 +52,8 @@ CREATE POLICY "Users can view own purchases" ON public.purchases
 -- Writes only via service_role (webhooks / Edge Functions). No client insert/update policy.
 
 -- 3. Convenience view the client can read to check entitlement without exposing ledger details.
-CREATE OR REPLACE VIEW public.my_entitlement
+DROP VIEW IF EXISTS public.my_entitlement;
+CREATE VIEW public.my_entitlement
 WITH (security_invoker = true) AS
   SELECT
     p.id AS user_id,

@@ -19,7 +19,8 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useEntitlement } from '../hooks/useEntitlement';
 import { getProfile, signOut } from '../services/authService';
-import { PREMIUM_PRICE_DISPLAY, SUPPORT_EMAIL } from '../config/constants';
+import { PREMIUM_TRIAL_DAYS, SUPPORT_EMAIL } from '../config/constants';
+import { deleteAccount } from '../services/paymentService';
 import {
   getSavedNumberSets,
   getNumberCollectionItems,
@@ -57,7 +58,7 @@ type MyPageRouteParams = {
 
 export function MyPageScreen({ navigation }: any) {
   const { user } = useAuth();
-  const { isPremium } = useEntitlement();
+  const { isPremium, source, trialEligible } = useEntitlement();
   const route = useRoute();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [savedNumbers, setSavedNumbers] = useState<SavedNumberSet[]>([]);
@@ -81,6 +82,8 @@ export function MyPageScreen({ navigation }: any) {
     variant: AppFeedbackVariant;
   } | null>(null);
   const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     const focus = (route.params as MyPageRouteParams | undefined)?.focus;
@@ -259,6 +262,19 @@ export function MyPageScreen({ navigation }: any) {
     }
   };
 
+  const performDeleteAccount = async () => {
+    setDeletingAccount(true);
+    const { error } = await deleteAccount();
+    setDeletingAccount(false);
+    if (error) {
+      setAlertFeedback({ title: 'Could not delete account', message: error, variant: 'error' });
+      return;
+    }
+    if (Platform.OS !== 'web') {
+      navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
+    }
+  };
+
   const handleSignOut = () => {
     setSignOutConfirmVisible(true);
   };
@@ -328,7 +344,7 @@ export function MyPageScreen({ navigation }: any) {
               All 5 AI prediction modes
             </Text>
             <Text style={styles.upgradeCardSub}>
-              One-time {PREMIUM_PRICE_DISPLAY} • no subscription
+              {trialEligible ? `${PREMIUM_TRIAL_DAYS}-day free trial • cancel anytime` : 'Monthly or yearly • cancel anytime'}
             </Text>
           </View>
           <View style={styles.upgradeCardCta}>
@@ -464,6 +480,17 @@ export function MyPageScreen({ navigation }: any) {
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.deleteAccountButton}
+        onPress={() => setDeleteConfirmVisible(true)}
+        disabled={deletingAccount}
+        accessibilityRole="button"
+      >
+        <Text style={styles.deleteAccountText}>
+          {deletingAccount ? 'Deleting account…' : 'Delete account'}
+        </Text>
       </TouchableOpacity>
 
       <Text style={styles.version}>LottoDream v1.0.0</Text>
@@ -672,6 +699,30 @@ export function MyPageScreen({ navigation }: any) {
         onConfirm={() => {
           setSignOutConfirmVisible(false);
           void performSignOut();
+        }}
+      />
+
+      <AppFeedbackModal
+        visible={deleteConfirmVisible}
+        title="Delete your account?"
+        message={
+          'This permanently deletes your profile, saved numbers, and number collection. It cannot be undone.' +
+          (source === 'apple'
+            ? '\n\nYour subscription is billed by Apple — cancel it in Settings → Apple ID → Subscriptions, or you will keep being charged.'
+            : source === 'google'
+              ? '\n\nYour subscription is billed by Google Play — cancel it in the Play Store → Payments & subscriptions, or you will keep being charged.'
+              : isPremium
+                ? '\n\nYour web subscription will be cancelled immediately.'
+                : '')
+        }
+        variant="warning"
+        cancelLabel="Cancel"
+        onCancel={() => setDeleteConfirmVisible(false)}
+        confirmLabel="Delete permanently"
+        confirmDestructive
+        onConfirm={() => {
+          setDeleteConfirmVisible(false);
+          void performDeleteAccount();
         }}
       />
     </>
@@ -978,6 +1029,17 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  deleteAccountButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  deleteAccountText: {
+    color: isWebDashboard ? webDash.textSecondary : '#A0AEC0',
+    fontSize: 13,
+    textDecorationLine: 'underline',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   version: {
