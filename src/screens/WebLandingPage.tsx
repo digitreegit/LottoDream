@@ -1,8 +1,8 @@
 // ============================================
-// Web Landing Page – marketing-style website ("draw night" dark theme)
+// Web Landing Page – marketing site, Apple HIG-inspired dark theme
 // ============================================
-// Layout lives in React Native styles. Web-only polish (gradients, glow,
-// glossy balls, entrance animations, hover lift) comes from one scoped
+// Layout lives in React Native styles. Web-only polish (nav blur, glossy
+// balls, subtle transitions, hover/focus states) comes from one scoped
 // stylesheet keyed by `data-ld` attributes — see LANDING_CSS below.
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -66,19 +66,22 @@ const POWERBALL_DRAW_DAYS = [1, 3, 6];
 const MEGA_DRAW_DAYS = [2, 5];
 
 const C = {
-  ink: '#060913',
-  ink2: '#0A1020',
-  surface: 'rgba(255,255,255,0.035)',
-  surfaceHi: 'rgba(255,255,255,0.06)',
-  border: 'rgba(255,255,255,0.09)',
-  text: '#F4F6FB',
-  muted: '#9AA4B8',
-  faint: '#8A94A8',
-  teal: '#1FD3A8',
-  tealDeep: '#00A383',
+  bg: '#000000',
+  bgAlt: '#0A0A0C',
+  card: '#161618',
+  cardHi: '#232326',
+  sep: 'rgba(255,255,255,0.14)',
+  text: '#F5F5F7',
+  muted: '#A1A1A6',
+  faint: '#86868B',
+  /** Single brand accent for links, icons and highlights (11:1 on black). */
+  accent: '#2DD4A7',
+  /** Accent fill behind white labels (4.5:1). */
+  accentFill: '#00866B',
+  chartBar: 'rgba(255,255,255,0.18)',
+  /** Lottery-ball colors are content, not UI accents. */
   gold: '#FFC857',
   red: '#FF4D5E',
-  blue: '#4C8DFF',
 };
 
 /** SF Pro on Apple devices, platform UI font elsewhere. */
@@ -86,7 +89,6 @@ const FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, sans-serif';
 
 const PICK_MODES = ['Balanced', 'Hot', 'Cold', 'Anti-Crowd', 'Lucky Dates'] as const;
-const PICK_CYCLE_MS = 3200;
 
 type SectionKey = 'features' | 'jackpots' | 'howItWorks' | 'pricing';
 
@@ -128,14 +130,6 @@ function patternScore(whites: number[]): number {
   return Math.round(Math.max(55, 99 - sumPenalty - balancePenalty));
 }
 
-function prefersReducedMotion(): boolean {
-  return (
-    Platform.OS === 'web' &&
-    typeof window !== 'undefined' &&
-    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
 /** Inject the landing stylesheet once (web). */
 function useLandingStyles() {
   useEffect(() => {
@@ -164,11 +158,14 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
   });
   const sectionRefs = useRef<Partial<Record<SectionKey, View | null>>>({});
   const [menuOpen, setMenuOpen] = useState(false);
+  const [jackpotsLoading, setJackpotsLoading] = useState(true);
   const [landingJackpots, setLandingJackpots] = useState<{
     powerball: LandingJackpotDisplay | null;
     megamillions: LandingJackpotDisplay | null;
   }>({ powerball: null, megamillions: null });
 
+  // Hero demo is driven by the visitor (HIG: give people agency, avoid time-boxed UI).
+  const [modeIndex, setModeIndex] = useState(0);
   const [round, setRound] = useState(0);
   const [pick, setPick] = useState(() => ({
     whites: [7, 19, 33, 48, 62],
@@ -183,6 +180,8 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
         if (!cancelled) setLandingJackpots(j);
       } catch {
         if (!cancelled) setLandingJackpots({ powerball: null, megamillions: null });
+      } finally {
+        if (!cancelled) setJackpotsLoading(false);
       }
     })();
     return () => {
@@ -190,15 +189,11 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
     };
   }, []);
 
-  // Hero demo: draw a fresh pick every few seconds.
-  useEffect(() => {
-    if (prefersReducedMotion()) return;
-    const id = setInterval(() => {
-      setPick(randomPowerballPick());
-      setRound((r) => r + 1);
-    }, PICK_CYCLE_MS);
-    return () => clearInterval(id);
-  }, []);
+  const generatePick = (nextMode = modeIndex) => {
+    setModeIndex(nextMode);
+    setPick(randomPowerballPick());
+    setRound((r) => r + 1);
+  };
 
   const trackSection = (key: SectionKey) => ({
     ref: (node: View | null) => {
@@ -223,17 +218,19 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
     scrollViewRef.current?.scrollTo({ y: Math.max(y - STICKY_NAV_OFFSET, 0), animated: true });
   };
 
-  const mode = PICK_MODES[round % PICK_MODES.length];
+  const mode = PICK_MODES[modeIndex];
   const score = patternScore(pick.whites);
   const sum = pick.whites.reduce((a, b) => a + b, 0);
   const odd = pick.whites.filter((n) => n % 2).length;
   const pbJackpot = landingJackpots.powerball?.amountDisplay;
-  const gutter = isWide ? 40 : 16;
+  const gutter = isWide ? 40 : 20;
+  const bandPad = { paddingVertical: isWide ? 112 : 72 };
+  const ballSize = isMid ? 56 : 44;
 
   const navLinks: { key: SectionKey; label: string }[] = [
-    { key: 'features', label: 'Features' },
     { key: 'jackpots', label: 'Jackpots' },
-    { key: 'howItWorks', label: 'How it works' },
+    { key: 'features', label: 'Features' },
+    { key: 'howItWorks', label: 'How It Works' },
     { key: 'pricing', label: 'Pricing' },
   ];
 
@@ -248,8 +245,8 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       {/* ── Nav ── */}
       <View style={styles.navShell}>
         <View style={styles.navBand} {...ld('nav')}>
-          <View style={[styles.container, styles.nav, { paddingHorizontal: gutter, paddingTop: 14 + insets.top }]}>
-            <LottoDreamLogo width={isMid ? 168 : 140} tone="onDark" />
+          <View style={[styles.container, styles.nav, { paddingHorizontal: gutter, paddingTop: insets.top }]}>
+            <LottoDreamLogo width={isMid ? 148 : 132} tone="onDark" />
             {isWide ? (
               <View style={styles.navLinks}>
                 {navLinks.map((l) => (
@@ -257,45 +254,37 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                     <Text style={styles.navLink}>{l.label}</Text>
                   </Pressable>
                 ))}
-                <Pressable onPress={onLogin} style={styles.navGhost} {...ld('btn-ghost')}>
-                  <Text style={styles.navGhostText}>Sign in</Text>
+                <Pressable onPress={onLogin} accessibilityRole="link" {...ld('navlink')}>
+                  <Text style={styles.navLink}>Sign In</Text>
                 </Pressable>
-                <Pressable onPress={onRegister} style={styles.navPrimary} {...ld('btn-primary')}>
-                  <Text style={styles.navPrimaryText}>Start free trial</Text>
-                </Pressable>
+                <Button label="Start Free Trial" onPress={onRegister} size="sm" />
               </View>
             ) : (
               <Pressable
                 style={styles.hamburger}
                 onPress={() => setMenuOpen((v) => !v)}
-                hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel={menuOpen ? 'Close menu' : 'Open menu'}
                 accessibilityState={{ expanded: menuOpen }}
               >
-                <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: 6 }, { rotate: '45deg' }] }]} />
-                <View style={[styles.hamburgerBar, menuOpen && { opacity: 0 }]} />
-                <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: -6 }, { rotate: '-45deg' }] }]} />
+                <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: 3.5 }, { rotate: '45deg' }] }]} />
+                <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: -3.5 }, { rotate: '-45deg' }] }]} />
               </Pressable>
             )}
           </View>
         </View>
         {!isWide && menuOpen && (
           <View style={styles.mobileOverlay}>
-            <Pressable style={[styles.mobileBackdrop, { height }]} onPress={() => setMenuOpen(false)} />
-            <View style={styles.mobileDrawer}>
+            <Pressable style={[styles.mobileBackdrop, { height }]} onPress={() => setMenuOpen(false)} accessibilityLabel="Close menu" />
+            <View style={[styles.mobileDrawer, { paddingHorizontal: gutter }]}>
               {navLinks.map((l) => (
                 <Pressable key={l.key} style={styles.mobileDrawerItem} onPress={() => scrollToSection(l.key)} accessibilityRole="link">
                   <Text style={styles.mobileDrawerText}>{l.label}</Text>
                 </Pressable>
               ))}
               <View style={styles.mobileDrawerCtas}>
-                <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => { setMenuOpen(false); onLogin(); }} {...ld('btn-ghost')}>
-                  <Text style={styles.btnGhostText}>Sign in</Text>
-                </Pressable>
-                <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => { setMenuOpen(false); onRegister(); }} {...ld('btn-primary')}>
-                  <Text style={styles.btnPrimaryText}>Start free trial</Text>
-                </Pressable>
+                <Button label="Sign In" variant="secondary" onPress={() => { setMenuOpen(false); onLogin(); }} grow />
+                <Button label="Start Free Trial" onPress={() => { setMenuOpen(false); onRegister(); }} grow />
               </View>
             </View>
           </View>
@@ -303,162 +292,151 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── Hero ── */}
-      <View style={styles.heroBand} {...ld('hero')}>
-        <View {...ld('orb-a')} style={styles.orbA} />
-        <View {...ld('orb-b')} style={styles.orbB} />
+      <View style={styles.heroBand}>
         <View style={[styles.container, styles.hero, isWide && styles.heroWide, { paddingHorizontal: gutter }]}>
-          <View style={[styles.heroCopy, isWide && styles.heroCopyWide]}>
-            <View style={styles.livePill}>
-              <View style={styles.liveDot} {...ld('live-dot')} />
-              <Text style={styles.livePillText}>
-                {pbJackpot ? (
-                  <>
-                    Powerball jackpot now <Text style={styles.livePillStrong}>{pbJackpot}</Text>
-                  </>
-                ) : (
-                  '6 games · updated after every draw'
-                )}
-              </Text>
-            </View>
-
-            <Text style={[styles.heroTitle, isMid && styles.heroTitleMid, isWide && styles.heroTitleWide]} accessibilityRole="header">
-              Play your numbers{'\n'}
-              <Text style={styles.heroTitleAccent} {...ld('grad-text')}>like you mean it.</Text>
-            </Text>
-
-            <Text style={[styles.heroSub, isWide && styles.heroSubWide]}>
-              AI pick strategies, live jackpots, and a daily lucky-number reading for Powerball,
-              Mega Millions, Cash4Life, Take 5, NY Lotto & Pick 10 — all in one place.
-            </Text>
-
-            <View style={[styles.heroCtas, isMid && styles.heroCtasRow]}>
-              <Pressable style={[styles.btn, styles.btnPrimary, styles.btnLg]} onPress={onRegister} {...ld('btn-primary')}>
-                <Text style={[styles.btnPrimaryText, styles.btnLgText]}>
-                  Start {PREMIUM_TRIAL_DAYS}-day free trial
-                </Text>
-              </Pressable>
-              <Pressable style={[styles.btn, styles.btnGhost, styles.btnLg]} onPress={onLogin} {...ld('btn-ghost')}>
-                <Text style={[styles.btnGhostText, styles.btnLgText]}>Sign in</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.trustRow}>
-              {['Free plan forever', 'Cancel anytime', 'Web · iOS · Android'].map((t) => (
-                <View key={t} style={styles.trustItem}>
-                  <CheckIcon color={C.teal} size={14} />
-                  <Text style={styles.trustText}>{t}</Text>
-                </View>
-              ))}
-            </View>
+          <Text style={[styles.heroKicker, isMid && styles.heroKickerMid]}>
+            {pbJackpot ? `Powerball jackpot: ${pbJackpot}` : 'Six games. Updated after every draw.'}
+          </Text>
+          <Text
+            style={[styles.heroTitle, isMid && styles.heroTitleMid, isWide && styles.heroTitleWide]}
+            accessibilityRole="header"
+          >
+            Play your numbers.{'\n'}
+            <Text style={styles.heroTitleAccent}>Like you mean it.</Text>
+          </Text>
+          <Text style={[styles.heroSub, isMid && styles.heroSubMid]}>
+            Smart pick strategies, live jackpots, and a daily lucky-number reading for six US lottery games.
+          </Text>
+          <View style={styles.heroCtas}>
+            <Button label={`Try ${PREMIUM_TRIAL_DAYS} Days Free`} onPress={onRegister} size="lg" />
+            <Button label="Sign In" onPress={onLogin} variant="link" size="lg" chevron />
           </View>
+          <Text style={styles.heroFine}>Free plan available · Cancel anytime · Web, iPhone, and Android</Text>
+        </View>
 
-          {/* Live pick card */}
-          <View style={[styles.pickWrap, isWide && styles.pickWrapWide]}>
-            <View style={styles.pickCard} {...ld('pick-card')}>
-              <View style={styles.pickHeader}>
-                <View>
-                  <Text style={styles.pickEyebrow}>POWERBALL · AI PICK</Text>
-                  <Text style={styles.pickMode}>{mode} mode</Text>
-                </View>
-                <View style={styles.pickChip}>
-                  <Text style={styles.pickChipText}>#{String(round + 1).padStart(3, '0')}</Text>
-                </View>
+        {/* Interactive pick demo */}
+        <View style={[styles.pickWrap, { paddingHorizontal: gutter }]}>
+          <View style={[styles.pickCard, isMid && styles.pickCardMid]}>
+            <View style={styles.pickHeader}>
+              <View style={{ flexShrink: 1 }}>
+                <Text style={styles.pickTitle}>Powerball pick</Text>
+                <Text style={styles.pickSubtitle}>{mode} strategy</Text>
               </View>
-
-              <View style={styles.ballRow}>
-                {pick.whites.map((n, i) => (
-                  <Ball key={`${round}-${i}`} n={n} kind="white" size={isMid ? 54 : 44} delay={i * 90} />
-                ))}
-                <Ball key={`${round}-pb`} n={pick.power} kind="red" size={isMid ? 54 : 44} delay={5 * 90} />
-              </View>
-
-              <View style={styles.pickStats}>
-                <View style={styles.pickStatWide}>
-                  <View style={styles.pickStatHead}>
-                    <Text style={styles.pickStatLabel}>Pattern score</Text>
-                    <Text style={styles.pickStatValue}>{score}</Text>
-                  </View>
-                  <View style={styles.meterTrack}>
-                    <View style={[styles.meterFill, { width: `${score}%` as any }]} {...ld('meter')} />
-                  </View>
-                </View>
-                <View style={styles.pickStat}>
-                  <Text style={styles.pickStatLabel}>Sum</Text>
-                  <Text style={styles.pickStatValue}>{sum}</Text>
-                </View>
-                <View style={styles.pickStat}>
-                  <Text style={styles.pickStatLabel}>Odd / Even</Text>
-                  <Text style={styles.pickStatValue}>
-                    {odd} / {5 - odd}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.modeRow}>
-                {PICK_MODES.map((m) => (
-                  <View key={m} style={[styles.modeChip, m === mode && styles.modeChipActive]}>
-                    <Text style={[styles.modeChipText, m === mode && styles.modeChipTextActive]}>{m}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <Text style={styles.pickFoot}>
-                The odds never change — the way you pick can be a lot more fun.
-              </Text>
+              <Button label="New Pick" variant="tinted" size="sm" onPress={() => generatePick()} />
             </View>
+
+            <View
+              style={styles.ballRow}
+              accessibilityLabel={`Numbers ${pick.whites.join(', ')}, Powerball ${pick.power}`}
+              {...({ 'aria-live': 'polite' } as object)}
+            >
+              {pick.whites.map((n, i) => (
+                <Ball key={`${round}-${i}`} n={n} kind="white" size={ballSize} delay={round ? i * 50 : undefined} />
+              ))}
+              <Ball key={`${round}-pb`} n={pick.power} kind="red" size={ballSize} delay={round ? 250 : undefined} />
+            </View>
+
+            <View style={styles.pickStats}>
+              <View style={styles.pickStat}>
+                <Text style={styles.pickStatLabel} numberOfLines={1}>{isMid ? 'Pattern score' : 'Score'}</Text>
+                <Text style={styles.pickStatValue}>{score}</Text>
+                <View style={styles.meterTrack}>
+                  <View style={[styles.meterFill, { width: `${score}%` as any }]} {...ld('meter')} />
+                </View>
+              </View>
+              <View style={styles.pickStatDivider} />
+              <View style={styles.pickStat}>
+                <Text style={styles.pickStatLabel}>Sum</Text>
+                <Text style={styles.pickStatValue}>{sum}</Text>
+              </View>
+              <View style={styles.pickStatDivider} />
+              <View style={styles.pickStat}>
+                <Text style={styles.pickStatLabel}>Odd / even</Text>
+                <Text style={styles.pickStatValue}>
+                  {odd} / {5 - odd}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel="Pick strategy">
+              {PICK_MODES.map((m, i) => {
+                const selected = i === modeIndex;
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => generatePick(i)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    style={({ pressed }) => [
+                      styles.segment,
+                      { minHeight: isMid ? 36 : 44 },
+                      selected && styles.segmentSelected,
+                      pressed && styles.pressed,
+                    ]}
+                    {...ld('segment')}
+                  >
+                    <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{m}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.pickFoot}>
+              Every combination has the same odds. Strategies change how you pick, not your chances.
+            </Text>
           </View>
         </View>
       </View>
 
       {/* ── Jackpots ── */}
-      <View style={styles.band} {...trackSection('jackpots')}>
+      <View style={[styles.band, bandPad]} {...trackSection('jackpots')}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
           <SectionHead
             eyebrow="Live jackpots"
-            title="What's on the line this week"
-            sub="Estimated annuitized jackpots, refreshed throughout the day."
+            title="What’s on the line this week."
+            sub="Estimated annuity jackpots, refreshed throughout the day."
           />
-          <View style={[styles.jackpotRow, isMid && styles.rowWrap]}>
+          <View style={[styles.cardRow, isMid && styles.rowWrap]}>
             <JackpotCard
-              kind="powerball"
               logo={POWERBALL_LOGO}
               logoStyle={styles.logoPowerball}
               name="Powerball"
               amount={landingJackpots.powerball?.amountDisplay}
+              loading={jackpotsLoading}
               nextDraw={
                 landingJackpots.powerball?.nextDrawDate ??
                 nextScheduledDrawOnOrAfter(new Date(), POWERBALL_DRAW_DAYS)
               }
-              rules="5 of 1–69 + Powerball 1–26 · Mon, Wed, Sat"
+              rules="5 of 1–69 plus Powerball 1–26 · Mon, Wed, Sat"
               wide={isMid}
             />
             <JackpotCard
-              kind="mega"
               logo={MEGA_MILLIONS_LOGO}
               logoStyle={styles.logoMega}
               name="Mega Millions"
               amount={landingJackpots.megamillions?.amountDisplay}
+              loading={jackpotsLoading}
               nextDraw={
                 landingJackpots.megamillions?.nextDrawDate ??
                 nextScheduledDrawOnOrAfter(new Date(), MEGA_DRAW_DAYS)
               }
-              rules="5 of 1–70 + Mega Ball 1–24 · Tue, Fri"
+              rules="5 of 1–70 plus Mega Ball 1–24 · Tue, Fri"
               wide={isMid}
             />
           </View>
         </View>
       </View>
 
-      {/* ── Features (bento) ── */}
-      <View style={styles.band} {...trackSection('features')}>
+      {/* ── Features ── */}
+      <View style={[styles.band, styles.bandAlt, bandPad]} {...trackSection('features')}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
           <SectionHead
             eyebrow="Features"
-            title="Everything between a hunch and a ticket"
-            sub="Explore the numbers, pick a strategy, and keep your favorite sets on every device."
+            title="Everything between a hunch and a ticket."
+            sub="Explore the numbers, choose a strategy, and keep your favorite sets on every device."
           />
           <View style={[styles.bento, isMid && styles.rowWrap]}>
-            {FEATURES.map((f, i) => (
+            {FEATURES.map((f) => (
               <View
                 key={f.title}
                 style={[
@@ -466,19 +444,16 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                   isWide && (f.span === 2 ? styles.span2 : f.span === 3 ? styles.span3 : styles.span1),
                   !isWide && isMid && (f.span === 1 ? styles.half : styles.full),
                 ]}
-                {...ld('card')}
               >
-                <View style={[styles.featureIcon, { backgroundColor: f.tint }]} {...ld(`icon-${i % 3}`)}>
-                  <Svg width={26} height={26} viewBox={FEATURE_ICON_VIEWBOX}>
-                    <Path d={f.svgPath} fill="none" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                </View>
                 <View style={f.span > 1 && isWide ? styles.featureBodyRow : undefined}>
                   <View style={f.span > 1 && isWide ? styles.featureTextCol : undefined}>
+                    <Svg width={30} height={30} viewBox={FEATURE_ICON_VIEWBOX} style={styles.featureIcon}>
+                      <Path d={f.svgPath} fill="none" stroke={C.accent} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
                     <Text style={styles.featureTitle}>{f.title}</Text>
                     <Text style={styles.featureDesc}>{f.desc}</Text>
                   </View>
-                  {f.title === 'Real-time analytics' ? <HotNumbersChart /> : null}
+                  {f.chart ? <HotNumbersChart /> : null}
                 </View>
               </View>
             ))}
@@ -487,15 +462,13 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── How it works ── */}
-      <View style={[styles.band, styles.bandAlt]} {...trackSection('howItWorks')}>
+      <View style={[styles.band, bandPad]} {...trackSection('howItWorks')}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
-          <SectionHead eyebrow="How it works" title="From sign-up to your first set in minutes" />
+          <SectionHead eyebrow="How it works" title="From sign-up to your first set in minutes." />
           <View style={[styles.steps, isWide && styles.stepsWide]}>
             {STEPS.map((s, i) => (
               <View key={s.title} style={[styles.step, isWide && styles.stepWide]}>
-                <Text style={styles.stepNum} {...ld('step-num')}>
-                  {String(i + 1).padStart(2, '0')}
-                </Text>
+                <Text style={styles.stepNum}>Step {i + 1}</Text>
                 <Text style={styles.stepTitle}>{s.title}</Text>
                 <Text style={styles.stepDesc}>{s.desc}</Text>
               </View>
@@ -505,15 +478,15 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── Pricing ── */}
-      <View style={styles.band} {...trackSection('pricing')}>
+      <View style={[styles.band, styles.bandAlt, bandPad]} {...trackSection('pricing')}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
           <SectionHead
             eyebrow="Pricing"
             title={`${PREMIUM_TRIAL_DAYS} days free. Then less than a ticket a week.`}
             sub="Pure Random stays free forever. Premium unlocks every strategy and all six games."
           />
-          <View style={[styles.pricingRow, isMid && styles.rowWrap]}>
-            <View style={[styles.planCard, isMid && styles.planHalf]} {...ld('card')}>
+          <View style={[styles.cardRow, styles.pricingRow, isMid && styles.rowWrap]}>
+            <View style={[styles.planCard, isMid && styles.half]}>
               <Text style={styles.planTier}>Free</Text>
               <View style={styles.planPriceRow}>
                 <Text style={styles.planPrice}>$0</Text>
@@ -521,45 +494,44 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
               </View>
               <Text style={styles.planNote}>Everything you need to explore.</Text>
               <View style={styles.planList}>
-                {['Pure Random picks', 'Live jackpots & draw results', 'Full draw history', 'Save up to 3 sets'].map((t) => (
+                {['Pure Random picks', 'Live jackpots and draw results', 'Full draw history', 'Save up to 3 sets'].map((t) => (
                   <PlanLine key={t} text={t} />
                 ))}
               </View>
-              <Pressable style={[styles.btn, styles.btnGhost, styles.planBtn]} onPress={onRegister} {...ld('btn-ghost')}>
-                <Text style={styles.btnGhostText}>Create free account</Text>
-              </Pressable>
+              <View style={styles.planBtn}>
+                <Button label="Create Free Account" variant="secondary" onPress={onRegister} grow />
+              </View>
             </View>
 
-            <View style={[styles.planProOuter, isMid && styles.planHalf]} {...ld('pro-border')}>
-              <View style={[styles.planCard, styles.planPro]}>
-                <View style={styles.planBadge} {...ld('badge')}>
-                  <Text style={styles.planBadgeText}>{PREMIUM_TRIAL_DAYS} DAYS FREE</Text>
+            <View style={[styles.planCard, styles.planPro, isMid && styles.half]}>
+              <View style={styles.planTierRow}>
+                <Text style={styles.planTier}>Premium</Text>
+                <View style={styles.planBadge}>
+                  <Text style={styles.planBadgeText}>{PREMIUM_TRIAL_DAYS} days free</Text>
                 </View>
-                <Text style={[styles.planTier, { color: C.gold }]}>Premium</Text>
-                <View style={styles.planPriceRow}>
-                  <Text style={styles.planPrice}>{PREMIUM_PRICE_DISPLAY}</Text>
-                  <Text style={styles.planPer}>{PREMIUM_PRICE_PERIOD.replace('/', 'per ')}</Text>
-                </View>
-                <Text style={styles.planNote}>
-                  or {PREMIUM_YEARLY_PRICE_DISPLAY}
-                  {PREMIUM_YEARLY_PRICE_PERIOD} —{' '}
-                  <Text style={{ color: C.teal, fontWeight: '700' }}>save {PREMIUM_YEARLY_SAVINGS_PCT}%</Text>
-                </Text>
-                <View style={styles.planList}>
-                  {[
-                    '5 AI pick strategies',
-                    "Today's Fortune lucky numbers",
-                    'Pattern scores & backtests',
-                    'All 6 games, unlimited saves',
-                    'Priority support',
-                  ].map((t) => (
-                    <PlanLine key={t} text={t} accent />
-                  ))}
-                </View>
-                <Pressable style={[styles.btn, styles.btnPrimary, styles.planBtn]} onPress={onRegister} {...ld('btn-primary')}>
-                  <Text style={styles.btnPrimaryText}>Start free trial</Text>
-                </Pressable>
-                <Text style={styles.planFine}>Card required · cancel anytime before day {PREMIUM_TRIAL_DAYS}</Text>
+              </View>
+              <View style={styles.planPriceRow}>
+                <Text style={styles.planPrice}>{PREMIUM_PRICE_DISPLAY}</Text>
+                <Text style={styles.planPer}>{PREMIUM_PRICE_PERIOD.replace('/', 'per ')}</Text>
+              </View>
+              <Text style={styles.planNote}>
+                or {PREMIUM_YEARLY_PRICE_DISPLAY}
+                {PREMIUM_YEARLY_PRICE_PERIOD} and save {PREMIUM_YEARLY_SAVINGS_PCT}%
+              </Text>
+              <View style={styles.planList}>
+                {[
+                  '5 pick strategies',
+                  "Today's Fortune lucky numbers",
+                  'Pattern scores and backtests',
+                  'All 6 games, unlimited saves',
+                  'Priority support',
+                ].map((t) => (
+                  <PlanLine key={t} text={t} />
+                ))}
+              </View>
+              <View style={styles.planBtn}>
+                <Button label="Start Free Trial" onPress={onRegister} grow />
+                <Text style={styles.planFine}>Card required. Cancel anytime before day {PREMIUM_TRIAL_DAYS}.</Text>
               </View>
             </View>
           </View>
@@ -567,28 +539,26 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── Final CTA ── */}
-      <View style={styles.band}>
-        <View style={[styles.container, { paddingHorizontal: gutter }]}>
-          <View style={[styles.finalCta, isWide && styles.finalCtaWide]} {...ld('final-cta')}>
-            <View style={[styles.finalBalls, { pointerEvents: 'none' }]}>
-              <Ball n={7} kind="white" size={isMid ? 64 : 46} float={0} />
-              <Ball n={21} kind="gold" size={isMid ? 52 : 38} float={1} />
-              <Ball n={26} kind="red" size={isMid ? 58 : 42} float={2} />
+      <View style={[styles.band, bandPad]}>
+        <View style={[styles.container, styles.finalCta, { paddingHorizontal: gutter }]}>
+          <View style={styles.finalBalls} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <Ball n={7} kind="white" size={isMid ? 60 : 46} />
+            <Ball n={21} kind="gold" size={isMid ? 60 : 46} />
+            <Ball n={26} kind="red" size={isMid ? 60 : 46} />
+          </View>
+          <Text style={[styles.finalTitle, isMid && styles.finalTitleMid]} accessibilityRole="header">
+            Lucky numbers, ready when you are.
+          </Text>
+          <Text style={[styles.finalSub, isMid && styles.heroSubMid]}>
+            Save picks, track every draw, and play your way — on the web and on your phone.
+          </Text>
+          <Button label="Start Free Trial" onPress={onRegister} size="lg" />
+          <View style={styles.storeRow}>
+            <View accessibilityRole="image" accessibilityLabel="Download on the App Store">
+              <Image source={APP_STORE_BADGE} style={styles.storeImgApple} resizeMode="contain" />
             </View>
-            <Text style={[styles.finalTitle, isMid && styles.finalTitleMid]}>Your lucky numbers are waiting.</Text>
-            <Text style={styles.finalSub}>
-              Save your picks, track every draw, and play your own way — on the web and on your phone.
-            </Text>
-            <Pressable style={[styles.btn, styles.btnDark, styles.btnLg]} onPress={onRegister} {...ld('btn-dark')}>
-              <Text style={[styles.btnDarkText, styles.btnLgText]}>Get started free</Text>
-            </Pressable>
-            <View style={styles.storeRow}>
-              <View style={styles.storeBadge} accessibilityRole="image" accessibilityLabel="Download on the App Store">
-                <Image source={APP_STORE_BADGE} style={styles.storeImgApple} resizeMode="contain" />
-              </View>
-              <View style={styles.storeBadge} accessibilityRole="image" accessibilityLabel="Get it on Google Play">
-                <Image source={GOOGLE_PLAY_BADGE} style={styles.storeImgGoogle} resizeMode="contain" />
-              </View>
+            <View accessibilityRole="image" accessibilityLabel="Get it on Google Play">
+              <Image source={GOOGLE_PLAY_BADGE} style={styles.storeImgGoogle} resizeMode="contain" />
             </View>
           </View>
         </View>
@@ -597,15 +567,17 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       {/* ── Footer ── */}
       <View style={styles.footer}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
-          <LottoDreamLogo width={140} tone="onDark" />
           <Text style={styles.footerDisclaimer}>
             LottoDream is not affiliated with, endorsed by, or sponsored by the Multi-State Lottery
             Association, Powerball, or Mega Millions. Lottery games involve random outcomes. No system,
             including AI-based analysis, can guarantee a winning ticket or change the odds. Play
             responsibly. Must be 18+ (or the legal gambling age in your jurisdiction) to play.
           </Text>
-          <Text style={styles.footerText}>Data sourced from NY Open Data · Updated after every drawing</Text>
-          <Text style={styles.footerText}>© {new Date().getFullYear()} Lotto Dream. All rights reserved.</Text>
+          <View style={styles.footerRule} />
+          <View style={[styles.footerBottom, isMid && styles.footerBottomRow]}>
+            <Text style={styles.footerText}>© {new Date().getFullYear()} Lotto Dream. All rights reserved.</Text>
+            <Text style={styles.footerText}>Data from NY Open Data · Updated after every drawing</Text>
+          </View>
         </View>
       </View>
     </ScrollView>
@@ -614,39 +586,68 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
 
 /* ── Pieces ── */
 
+/** Capsule button with a press state (HIG: custom buttons always need one). */
+function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  size = 'md',
+  grow,
+  chevron,
+}: {
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary' | 'tinted' | 'link';
+  size?: 'sm' | 'md' | 'lg';
+  grow?: boolean;
+  chevron?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.btn,
+        styles[`btn_${size}`],
+        styles[`btn_${variant}`],
+        grow && styles.btnGrow,
+        pressed && styles.pressed,
+      ]}
+      {...ld(`btn btn-${variant}`)}
+    >
+      <Text style={[styles.btnText, styles[`btnText_${size}`], styles[`btnText_${variant}`]]}>
+        {label}
+        {chevron ? ' ›' : ''}
+      </Text>
+    </Pressable>
+  );
+}
+
 function SectionHead({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) {
   const { width } = useWindowDimensions();
+  const isMid = width >= 640;
   return (
     <View style={styles.sectionHead}>
-      <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text>
-      <Text style={[styles.sectionTitle, width >= 640 && styles.sectionTitleMid]} accessibilityRole="header">
+      <Text style={[styles.eyebrow, isMid && styles.eyebrowMid]}>{eyebrow}</Text>
+      <Text
+        style={[styles.sectionTitle, isMid && styles.sectionTitleMid, width >= 900 && styles.sectionTitleWide]}
+        accessibilityRole="header"
+      >
         {title}
       </Text>
-      {sub ? <Text style={styles.sectionSub}>{sub}</Text> : null}
+      {sub ? <Text style={[styles.sectionSub, isMid && styles.sectionSubMid]}>{sub}</Text> : null}
     </View>
   );
 }
 
 const BALL_FALLBACK = { white: '#E9EDF5', red: C.red, gold: C.gold } as const;
 
-function Ball({
-  n,
-  kind,
-  size,
-  delay,
-  float,
-}: {
-  n: number;
-  kind: 'white' | 'red' | 'gold';
-  size: number;
-  delay?: number;
-  float?: number;
-}) {
+function Ball({ n, kind, size, delay }: { n: number; kind: 'white' | 'red' | 'gold'; size: number; delay?: number }) {
   const webAnim =
     Platform.OS === 'web'
       ? ({
-          dataSet: { ld: float != null ? `ball-${kind} float-${float}` : `ball-${kind} pop` },
-          style: { animationDelay: `${delay ?? 0}ms` },
+          dataSet: { ld: delay != null ? `ball-${kind} pop` : `ball-${kind}` },
+          style: delay != null ? { animationDelay: `${delay}ms` } : undefined,
         } as any)
       : {};
   return (
@@ -658,12 +659,7 @@ function Ball({
         webAnim.style,
       ]}
     >
-      <Text
-        style={[
-          styles.ballText,
-          { fontSize: size * 0.38, color: kind === 'white' ? '#0B1222' : '#FFFFFF' },
-        ]}
-      >
+      <Text style={[styles.ballText, { fontSize: size * 0.38, color: kind === 'white' ? '#1D1D1F' : '#FFFFFF' }]}>
         {n}
       </Text>
     </View>
@@ -671,50 +667,45 @@ function Ball({
 }
 
 function JackpotCard({
-  kind,
   logo,
   logoStyle,
   name,
   amount,
+  loading,
   nextDraw,
   rules,
   wide,
 }: {
-  kind: 'powerball' | 'mega';
   logo: any;
   logoStyle: object;
   name: string;
   amount?: string;
+  loading: boolean;
   nextDraw: Date;
   rules: string;
   wide: boolean;
 }) {
   const [num, unit] = amount ? amount.replace('$', '').split(/\s+/, 2) : ['', ''];
   return (
-    <View
-      style={[styles.jackpotCard, wide && styles.planHalf, { borderColor: kind === 'powerball' ? 'rgba(255,77,94,0.35)' : 'rgba(255,200,87,0.35)' }]}
-      {...ld(`jackpot-${kind}`)}
-    >
+    <View style={[styles.jackpotCard, wide && styles.half]}>
       <View style={styles.jackpotTop}>
         <View style={styles.jackpotLogoChip}>
           <Image source={logo} style={logoStyle} resizeMode="contain" accessibilityLabel={`${name} logo`} />
         </View>
-        <View style={styles.nextDrawPill}>
-          <Text style={styles.nextDrawText}>Next draw · {formatWeekdayShortDate(nextDraw)}</Text>
-        </View>
+        <Text style={styles.nextDrawText}>Next draw {formatWeekdayShortDate(nextDraw)}</Text>
       </View>
-      <Text style={styles.jackpotLabel}>ESTIMATED JACKPOT</Text>
+      <Text style={styles.jackpotLabel}>Estimated jackpot</Text>
       <View style={styles.jackpotAmountRow}>
         {amount ? (
           <>
             <Text style={styles.jackpotDollar}>$</Text>
-            <Text style={styles.jackpotAmount} {...ld(kind === 'powerball' ? 'amount-red' : 'amount-gold')}>
-              {num}
-            </Text>
+            <Text style={styles.jackpotAmount}>{num}</Text>
             {unit ? <Text style={styles.jackpotUnit}>{unit}</Text> : null}
           </>
+        ) : loading ? (
+          <View style={styles.jackpotSkeleton} accessibilityLabel="Loading jackpot" />
         ) : (
-          <Text style={styles.jackpotPending}>Updating after the next draw</Text>
+          <Text style={styles.jackpotPending}>Available after the next draw</Text>
         )}
       </View>
       <Text style={styles.jackpotRules}>{rules}</Text>
@@ -734,18 +725,25 @@ const HOT_BARS = [
 
 function HotNumbersChart() {
   return (
-    <View style={styles.chart} accessibilityLabel="Example hot-number frequency chart">
-      {HOT_BARS.map((b, i) => (
-        <View key={b.n} style={styles.chartCol}>
-          <View style={styles.chartTrack}>
-            <View
-              style={[styles.chartBar, { height: `${b.v * 100}%` as any, backgroundColor: i === 0 ? C.gold : C.teal }]}
-              {...ld('bar')}
-            />
+    <View
+      style={styles.chartWrap}
+      accessible
+      accessibilityLabel="Sample chart of most-drawn Powerball numbers. 23 is drawn most often, followed by 61, 32, 39, 21, 10, and 63."
+    >
+      <View style={styles.chart}>
+        {HOT_BARS.map((b, i) => (
+          <View key={b.n} style={styles.chartCol}>
+            <View style={styles.chartTrack}>
+              <View
+                style={[styles.chartBar, { height: `${b.v * 100}%` as any, backgroundColor: i === 0 ? C.accent : C.chartBar }]}
+                {...ld('bar')}
+              />
+            </View>
+            <Text style={[styles.chartLabel, i === 0 && styles.chartLabelTop]}>{b.n}</Text>
           </View>
-          <Text style={styles.chartLabel}>{b.n}</Text>
-        </View>
-      ))}
+        ))}
+      </View>
+      <Text style={styles.chartCaption}>Most-drawn white balls (sample)</Text>
     </View>
   );
 }
@@ -753,15 +751,15 @@ function HotNumbersChart() {
 function CheckIcon({ color, size = 16 }: { color: string; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-function PlanLine({ text, accent }: { text: string; accent?: boolean }) {
+function PlanLine({ text }: { text: string }) {
   return (
     <View style={styles.planLine}>
-      <CheckIcon color={accent ? C.gold : C.teal} />
+      <CheckIcon color={C.accent} />
       <Text style={styles.planLineText}>{text}</Text>
     </View>
   );
@@ -769,122 +767,80 @@ function PlanLine({ text, accent }: { text: string; accent?: boolean }) {
 
 /* ── Static data ── */
 
-const FEATURES: { title: string; desc: string; svgPath: string; tint: string; span: 1 | 2 | 3 }[] = [
+const FEATURES: { title: string; desc: string; svgPath: string; span: 1 | 2 | 3; chart?: boolean }[] = [
   {
     title: 'Real-time analytics',
-    desc: 'See which numbers are running hot, which pairs show up together, and what is overdue — across years of draws.',
+    desc: 'See which numbers are running hot, which pairs show up together, and what’s overdue — across years of draws.',
     svgPath: FEATURE_BAR_PATH,
-    tint: C.tealDeep,
     span: 2,
+    chart: true,
   },
   {
-    title: 'AI pick strategies',
-    desc: 'Hot, Cold, Balanced, Anti-Crowd and Lucky Dates — or keep it pure random.',
+    title: 'Pick strategies',
+    desc: 'Hot, Cold, Balanced, Anti-Crowd, and Lucky Dates — or keep it pure random.',
     svgPath: FEATURE_AI_PATH,
-    tint: '#7C5CFF',
     span: 1,
   },
   {
-    title: "Today's Fortune",
-    desc: 'A daily luck reading from your birthdate with matching numbers. Never stored.',
+    title: 'Today’s Fortune',
+    desc: 'A daily luck reading from your birthdate, with matching numbers. Never stored.',
     svgPath: FEATURE_BOLT_PATH,
-    tint: '#E0A100',
     span: 1,
   },
   {
-    title: '6 lottery games',
-    desc: 'Powerball, Mega Millions, Cash4Life, Take 5, NY Lotto & Pick 10.',
+    title: 'Six lottery games',
+    desc: 'Powerball, Mega Millions, Cash4Life, Take 5, NY Lotto, and Pick 10.',
     svgPath: FEATURE_HISTORY_PATH,
-    tint: '#E5484D',
     span: 1,
   },
   {
     title: 'Pattern scores',
     desc: 'Every pick gets a pattern score, a backtest against past draws, and a Monte Carlo view.',
     svgPath: FEATURE_PLATFORM_PATH,
-    tint: '#2F6FED',
     span: 1,
   },
   {
     title: 'Private by design',
-    desc: 'Your picks sync securely across web, iPhone and Android. We never sell or share your data.',
+    desc: 'Picks sync securely across web, iPhone, and Android. We never sell or share your data.',
     svgPath: FEATURE_SECURE_PATH,
-    tint: '#12805C',
     span: 3,
   },
 ];
 
 const STEPS = [
-  { title: 'Create an account', desc: 'Sign up in seconds with email or Google — the free plan never expires.' },
-  { title: 'Explore the data', desc: 'Browse hot/cold trends, draw history, and live jackpots for every game.' },
-  { title: 'Build your picks', desc: 'Choose a strategy, add your lucky dates, and generate a set you like.' },
-  { title: 'Save & play', desc: 'Keep favorite sets, check them against each draw, and tweak as you go.' },
+  { title: 'Create an account', desc: 'Sign up in seconds with email or Google. The free plan never expires.' },
+  { title: 'Explore the data', desc: 'Browse hot and cold trends, draw history, and live jackpots for every game.' },
+  { title: 'Build a pick', desc: 'Choose a strategy, add lucky dates, and generate a set you like.' },
+  { title: 'Save and play', desc: 'Keep favorite sets, check them against each draw, and adjust as you go.' },
 ];
 
 /* ── Web-only stylesheet (hooks via data-ld) ── */
 
 const LANDING_CSS = `
-[data-ld~="nav"] { backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px); background: rgba(6,9,19,0.72) !important; }
-[data-ld~="navlink"] > div { transition: color .15s ease; }
-[data-ld~="navlink"]:hover > div { color: #FFFFFF !important; }
-
-[data-ld~="hero"] { background:
-  radial-gradient(1200px 600px at 85% -10%, rgba(31,211,168,0.16), transparent 60%),
-  radial-gradient(900px 500px at -10% 30%, rgba(124,92,255,0.14), transparent 60%),
-  linear-gradient(180deg, #060913 0%, #0A1020 100%) !important; }
-[data-ld~="orb-a"], [data-ld~="orb-b"] { filter: blur(60px); animation: ld-drift 14s ease-in-out infinite alternate; }
-[data-ld~="orb-a"] { background: radial-gradient(circle, rgba(255,200,87,0.35), transparent 70%) !important; }
-[data-ld~="orb-b"] { background: radial-gradient(circle, rgba(255,77,94,0.25), transparent 70%) !important; animation-duration: 18s; }
-@keyframes ld-drift { from { transform: translate(0,0) scale(1); } to { transform: translate(-40px, 30px) scale(1.15); } }
-
-[data-ld~="grad-text"] { background: linear-gradient(92deg, #1FD3A8 0%, #FFC857 55%, #FF7A59 100%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
-[data-ld~="step-num"] { background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.08)); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
-[data-ld~="amount-red"] { background: linear-gradient(180deg, #FFFFFF 20%, #FF9AA5 100%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
-[data-ld~="amount-gold"] { background: linear-gradient(180deg, #FFFFFF 20%, #FFD98A 100%); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
-
-[data-ld~="live-dot"] { box-shadow: 0 0 0 0 rgba(31,211,168,0.7); animation: ld-pulse 1.8s ease-out infinite; }
-@keyframes ld-pulse { to { box-shadow: 0 0 0 10px rgba(31,211,168,0); } }
-
-[data-ld~="pick-card"] { background: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02)) !important; box-shadow: 0 40px 80px -30px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.12); backdrop-filter: blur(10px); }
-[data-ld~="meter"] { background: linear-gradient(90deg, #1FD3A8, #FFC857) !important; transition: width .6s cubic-bezier(.2,.8,.2,1); }
-
-[data-ld~="ball-white"] { background: radial-gradient(circle at 32% 28%, #FFFFFF 0%, #EEF1F7 38%, #B7C0D1 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.18), 0 10px 20px -8px rgba(0,0,0,0.6); }
-[data-ld~="ball-red"] { background: radial-gradient(circle at 32% 28%, #FFB3BB 0%, #FF4D5E 42%, #9E1026 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.25), 0 10px 24px -6px rgba(255,77,94,0.55); }
-[data-ld~="ball-gold"] { background: radial-gradient(circle at 32% 28%, #FFF1C7 0%, #FFC857 45%, #B7791F 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.2), 0 10px 24px -6px rgba(255,200,87,0.5); }
-[data-ld~="pop"] { animation: ld-pop .45s cubic-bezier(.25,.1,.25,1) both; }
-@keyframes ld-pop { from { transform: translateY(-8px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
-[data-ld~="float-0"], [data-ld~="float-1"], [data-ld~="float-2"] { animation: ld-float 5s ease-in-out infinite; }
-[data-ld~="float-1"] { animation-delay: -1.6s; animation-duration: 6s; }
-[data-ld~="float-2"] { animation-delay: -3.1s; animation-duration: 5.5s; }
-@keyframes ld-float { 50% { transform: translateY(-6px); } }
-
-[data-ld~="card"], [data-ld~="jackpot-powerball"], [data-ld~="jackpot-mega"] { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
-[data-ld~="card"]:hover { border-color: rgba(255,255,255,0.16) !important; }
-[data-ld~="jackpot-powerball"] { background: radial-gradient(600px 300px at 0% 0%, rgba(255,77,94,0.28), transparent 60%), linear-gradient(160deg, #1A0B12, #0B0B16) !important; }
-[data-ld~="jackpot-mega"] { background: radial-gradient(600px 300px at 0% 0%, rgba(255,200,87,0.22), transparent 60%), linear-gradient(160deg, #0B1530, #0B0B16) !important; }
-[data-ld~="icon-0"], [data-ld~="icon-1"], [data-ld~="icon-2"] { box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 20px -8px rgba(0,0,0,0.6); }
-[data-ld~="bar"] { transform-origin: bottom; animation: ld-grow .9s cubic-bezier(.2,.8,.2,1) both; }
-@keyframes ld-grow { from { transform: scaleY(0); } }
-
-[data-ld~="pro-border"] { background: linear-gradient(160deg, rgba(255,200,87,0.9), rgba(255,200,87,0.25)) !important; box-shadow: 0 30px 80px -40px rgba(255,200,87,0.3); }
-[data-ld~="badge"] { background: linear-gradient(90deg, #FFC857, #FF9F5A) !important; }
-
-[data-ld~="btn-primary"] { background: linear-gradient(180deg, #2BE3B6, #00A383) !important; box-shadow: 0 10px 30px -10px rgba(31,211,168,0.7), inset 0 1px 0 rgba(255,255,255,0.35); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; cursor: pointer; }
-[data-ld~="btn-primary"]:hover { filter: brightness(1.06); box-shadow: 0 16px 40px -12px rgba(31,211,168,0.85), inset 0 1px 0 rgba(255,255,255,0.35); }
-[data-ld~="btn-ghost"] { transition: background-color .15s ease, border-color .15s ease; cursor: pointer; }
-[data-ld~="btn-ghost"]:hover { background-color: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.3) !important; }
-[data-ld~="btn-dark"] { transition: transform .15s ease; cursor: pointer; }
-[data-ld~="btn-dark"]:hover { filter: brightness(1.25); }
-[data-ld~="btn-primary"]:active, [data-ld~="btn-ghost"]:active, [data-ld~="btn-dark"]:active { transform: scale(.97); }
-
-[data-ld~="final-cta"] { background:
-  radial-gradient(700px 400px at 100% 0%, rgba(255,200,87,0.55), transparent 60%),
-  radial-gradient(700px 400px at 0% 100%, rgba(124,92,255,0.45), transparent 60%),
-  linear-gradient(135deg, #00A383, #0E7A67) !important; }
-
-[data-ld~="btn-primary"]:focus-visible, [data-ld~="btn-ghost"]:focus-visible, [data-ld~="btn-dark"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid #4C8DFF; outline-offset: 3px; }
 [data-ld~="root"], [data-ld~="root"] * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 [data-ld~="root"] div[dir] { font-family: inherit; }
+
+[data-ld~="nav"] { backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); background: rgba(0,0,0,0.72) !important; }
+[data-ld~="navlink"] { cursor: pointer; }
+[data-ld~="navlink"] > div { transition: color .2s ease; }
+[data-ld~="navlink"]:hover > div { color: #FFFFFF !important; }
+
+[data-ld~="ball-white"] { background: radial-gradient(circle at 35% 30%, #FFFFFF 0%, #F2F3F6 45%, #C9CDD6 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.12), 0 6px 14px -8px rgba(0,0,0,0.7); }
+[data-ld~="ball-red"] { background: radial-gradient(circle at 35% 30%, #FF8C97 0%, #FF4D5E 45%, #B3182E 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.2), 0 6px 14px -8px rgba(0,0,0,0.7); }
+[data-ld~="ball-gold"] { background: radial-gradient(circle at 35% 30%, #FFE7A8 0%, #FFC857 45%, #C08A22 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.18), 0 6px 14px -8px rgba(0,0,0,0.7); }
+[data-ld~="pop"] { animation: ld-pop .35s cubic-bezier(.25,.1,.25,1) both; }
+@keyframes ld-pop { from { transform: scale(.88); opacity: 0; } to { transform: none; opacity: 1; } }
+
+[data-ld~="meter"] { transition: width .4s cubic-bezier(.25,.1,.25,1); }
+[data-ld~="bar"] { transform-origin: bottom; animation: ld-grow .7s cubic-bezier(.25,.1,.25,1) both; }
+@keyframes ld-grow { from { transform: scaleY(0); } }
+
+[data-ld~="btn"], [data-ld~="segment"] { cursor: pointer; transition: background-color .2s ease, filter .2s ease, transform .1s ease; }
+[data-ld~="btn-primary"]:hover { filter: brightness(1.12); }
+[data-ld~="btn-secondary"]:hover, [data-ld~="btn-tinted"]:hover { filter: brightness(1.25); }
+[data-ld~="btn-link"]:hover > div { text-decoration: underline; }
+[data-ld~="segment"]:hover { background-color: rgba(255,255,255,0.08); }
+[data-ld~="btn"]:focus-visible, [data-ld~="segment"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid #2DD4A7; outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   [data-ld] { animation: none !important; transition: none !important; }
@@ -893,292 +849,179 @@ const LANDING_CSS = `
 
 /* ── Styles ── */
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.ink, fontFamily: FONT_STACK } as any,
-  scroll: { minHeight: '100%' as any, backgroundColor: C.ink },
-  container: { width: '100%' as any, maxWidth: 1200, alignSelf: 'center' },
+const styles = StyleSheet.create<any>({
+  root: { flex: 1, backgroundColor: C.bg, fontFamily: FONT_STACK },
+  scroll: { minHeight: '100%', backgroundColor: C.bg },
+  container: { width: '100%', maxWidth: 1080, alignSelf: 'center' },
+  pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
 
   /* Nav */
   navShell: { position: 'relative', zIndex: 30 },
-  navBand: {
-    backgroundColor: 'rgba(6,9,19,0.92)',
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  nav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 14,
-  },
-  navLinks: { flexDirection: 'row', alignItems: 'center', gap: 24 },
-  navLink: { color: C.muted, fontSize: 14, fontWeight: '500', paddingVertical: 12 },
-  navGhost: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  navGhostText: { color: C.text, fontSize: 14, fontWeight: '600' },
-  navPrimary: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 999, backgroundColor: C.tealDeep, marginLeft: -16 },
-  navPrimaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-
-  hamburger: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', gap: 4, marginRight: -8 },
-  hamburgerBar: { width: 22, height: 2, borderRadius: 2, backgroundColor: C.text },
-  mobileOverlay: { position: 'absolute', top: '100%' as any, left: 0, right: 0, zIndex: 40 },
-  mobileBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
-  mobileDrawer: {
-    backgroundColor: C.ink2,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 20,
-  },
-  mobileDrawerItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
-  mobileDrawerText: { color: C.text, fontSize: 16, fontWeight: '500' },
-  mobileDrawerCtas: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  navBand: { backgroundColor: 'rgba(0,0,0,0.9)', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep },
+  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 },
+  navLinks: { flexDirection: 'row', alignItems: 'center', gap: 28 },
+  navLink: { color: C.muted, fontSize: 14, paddingVertical: 10 },
+  hamburger: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', gap: 5, marginRight: -10 },
+  hamburgerBar: { width: 18, height: 1.5, borderRadius: 1, backgroundColor: C.text },
+  mobileOverlay: { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 40 },
+  mobileBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
+  mobileDrawer: { backgroundColor: C.bgAlt, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep, paddingTop: 4, paddingBottom: 20 },
+  mobileDrawerItem: { minHeight: 52, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep },
+  mobileDrawerText: { color: C.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.3 },
+  mobileDrawerCtas: { flexDirection: 'row', gap: 12, marginTop: 20 },
 
   /* Buttons */
-  btn: {
-    borderRadius: 999,
-    paddingHorizontal: 22,
-    paddingVertical: 13,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexGrow: 1,
-  },
-  btnLg: { paddingHorizontal: 28, paddingVertical: 16, flexGrow: 0 },
-  btnLgText: { fontSize: 16 },
-  btnPrimary: { backgroundColor: C.tealDeep },
-  btnPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  btnGhost: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.03)' },
-  btnGhostText: { color: C.text, fontSize: 15, fontWeight: '600' },
-  btnDark: { backgroundColor: C.ink },
-  btnDarkText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  btn: { borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  btnGrow: { flexGrow: 1, flexBasis: 0 },
+  btn_sm: { minHeight: 36, paddingHorizontal: 16 },
+  btn_md: { minHeight: 44, paddingHorizontal: 22 },
+  btn_lg: { minHeight: 50, paddingHorizontal: 28 },
+  btn_primary: { backgroundColor: C.accentFill },
+  btn_secondary: { backgroundColor: C.cardHi },
+  btn_tinted: { backgroundColor: 'rgba(45,212,167,0.14)' },
+  btn_link: { paddingHorizontal: 8 },
+  btnText: { fontWeight: '600', textAlign: 'center' },
+  btnText_sm: { fontSize: 14 },
+  btnText_md: { fontSize: 16 },
+  btnText_lg: { fontSize: 17 },
+  btnText_primary: { color: '#FFFFFF' },
+  btnText_secondary: { color: C.text },
+  btnText_tinted: { color: C.accent },
+  btnText_link: { color: C.accent },
 
   /* Hero */
-  heroBand: { position: 'relative', overflow: 'hidden', backgroundColor: C.ink2 },
-  orbA: { position: 'absolute', width: 420, height: 420, borderRadius: 210, right: -80, top: 120 },
-  orbB: { position: 'absolute', width: 360, height: 360, borderRadius: 180, left: '35%' as any, bottom: -160 },
-  hero: { paddingTop: 48, paddingBottom: 64, gap: 48 },
-  heroWide: { flexDirection: 'row', alignItems: 'center', paddingTop: 88, paddingBottom: 112, gap: 56 },
-  heroCopy: {},
-  heroCopyWide: { flex: 1.05 },
-  livePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(31,211,168,0.35)',
-    backgroundColor: 'rgba(31,211,168,0.08)',
-    marginBottom: 24,
-  },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.teal },
-  livePillText: { color: '#CFF7EC', fontSize: 13, fontWeight: '500' },
-  livePillStrong: { color: '#FFFFFF', fontWeight: '800' },
-  heroTitle: { color: C.text, fontSize: 42, lineHeight: 46, fontWeight: '700', letterSpacing: -1.2 },
-  heroTitleMid: { fontSize: 58, lineHeight: 62, letterSpacing: -1.8 },
-  heroTitleWide: { fontSize: 64, lineHeight: 68, letterSpacing: -2.2 },
-  heroTitleAccent: { color: C.teal },
-  heroSub: { color: C.muted, fontSize: 17, lineHeight: 27, marginTop: 22, maxWidth: 560 },
-  heroSubWide: { fontSize: 19, lineHeight: 30 },
-  heroCtas: { marginTop: 32, gap: 12 },
-  heroCtasRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginTop: 22 },
-  trustItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  trustText: { color: C.muted, fontSize: 13 },
+  heroBand: { backgroundColor: C.bg, paddingBottom: 96 },
+  hero: { alignItems: 'center', paddingTop: 56, paddingBottom: 48 },
+  heroWide: { paddingTop: 96, paddingBottom: 64 },
+  heroKicker: { color: C.accent, fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 14 },
+  heroKickerMid: { fontSize: 17 },
+  heroTitle: { color: C.text, fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -1, textAlign: 'center' },
+  heroTitleMid: { fontSize: 64, lineHeight: 68, letterSpacing: -1.6 },
+  heroTitleWide: { fontSize: 80, lineHeight: 84, letterSpacing: -2.2 },
+  heroTitleAccent: { color: C.muted },
+  heroSub: { color: C.muted, fontSize: 19, lineHeight: 27, marginTop: 20, maxWidth: 620, textAlign: 'center' },
+  heroSubMid: { fontSize: 21, lineHeight: 30 },
+  heroCtas: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 32 },
+  heroFine: { color: C.faint, fontSize: 14, marginTop: 20, textAlign: 'center' },
 
-  /* Pick card */
-  pickWrap: { width: '100%' as any, maxWidth: 520, alignSelf: 'center' },
-  pickWrapWide: { flex: 1, alignSelf: 'auto' as any },
-  pickCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 24,
-  },
-  pickHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 },
-  pickEyebrow: { color: C.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  pickMode: { color: C.text, fontSize: 20, fontWeight: '700', marginTop: 4 },
-  pickChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  pickChipText: { color: C.muted, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  /* Pick demo */
+  pickWrap: { width: '100%', maxWidth: 680, alignSelf: 'center' },
+  pickCard: { borderRadius: 28, backgroundColor: C.card, padding: 20 },
+  pickCardMid: { padding: 32 },
+  pickHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 24 },
+  pickTitle: { color: C.text, fontSize: 21, fontWeight: '600', letterSpacing: -0.3 },
+  pickSubtitle: { color: C.muted, fontSize: 15, marginTop: 2 },
   ballRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 6, marginBottom: 24 },
   ball: { alignItems: 'center', justifyContent: 'center' },
-  ballText: { fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
-  pickStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  pickStatWide: { flexBasis: '100%' as any },
-  pickStatHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
-  pickStat: { flex: 1 },
-  pickStatLabel: { color: C.faint, fontSize: 12, fontWeight: '500' },
-  pickStatValue: { color: C.text, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 2 },
-  meterTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  meterFill: { height: 8, borderRadius: 4, backgroundColor: C.teal },
-  modeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
-  modeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  modeChipActive: { backgroundColor: 'rgba(31,211,168,0.14)', borderColor: 'rgba(31,211,168,0.55)' },
-  modeChipText: { color: C.faint, fontSize: 12, fontWeight: '600' },
-  modeChipTextActive: { color: C.teal },
-  pickFoot: { color: C.muted, fontSize: 13, marginTop: 18, lineHeight: 19 },
+  ballText: { fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
+  pickStats: { flexDirection: 'row', borderRadius: 16, backgroundColor: C.cardHi, paddingVertical: 16, paddingHorizontal: 4 },
+  pickStat: { flex: 1, paddingHorizontal: 12 },
+  pickStatDivider: { width: StyleSheet.hairlineWidth, backgroundColor: C.sep },
+  pickStatLabel: { color: C.muted, fontSize: 13 },
+  pickStatValue: { color: C.text, fontSize: 24, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 4, letterSpacing: -0.4 },
+  meterTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginTop: 10 },
+  meterFill: { height: 4, borderRadius: 2, backgroundColor: C.accent },
+  segmented: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 20 },
+  segment: { paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
+  segmentSelected: { backgroundColor: C.text },
+  segmentText: { color: C.muted, fontSize: 14, fontWeight: '500' },
+  segmentTextSelected: { color: '#000000', fontWeight: '600' },
+  pickFoot: { color: C.faint, fontSize: 13, lineHeight: 19, marginTop: 20 },
 
   /* Sections */
-  band: { paddingVertical: 80, backgroundColor: C.ink },
-  bandAlt: { backgroundColor: C.ink2, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.border },
-  sectionHead: { marginBottom: 40, maxWidth: 720 },
-  eyebrow: { color: C.teal, fontSize: 13, fontWeight: '600', letterSpacing: 1.2, marginBottom: 12 },
-  sectionTitle: { color: C.text, fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -0.6 },
-  sectionTitleMid: { fontSize: 42, lineHeight: 48, letterSpacing: -1.2 },
-  sectionSub: { color: C.muted, fontSize: 17, lineHeight: 26, marginTop: 14 },
+  band: { backgroundColor: C.bg },
+  bandAlt: { backgroundColor: C.bgAlt },
+  sectionHead: { alignItems: 'center', alignSelf: 'center', maxWidth: 760, marginBottom: 48 },
+  eyebrow: { color: C.accent, fontSize: 17, fontWeight: '600', marginBottom: 10, textAlign: 'center' },
+  eyebrowMid: { fontSize: 19 },
+  sectionTitle: { color: C.text, fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -0.6, textAlign: 'center' },
+  sectionTitleMid: { fontSize: 44, lineHeight: 50, letterSpacing: -1 },
+  sectionTitleWide: { fontSize: 52, lineHeight: 58, letterSpacing: -1.3 },
+  sectionSub: { color: C.muted, fontSize: 17, lineHeight: 25, marginTop: 16, textAlign: 'center' },
+  sectionSubMid: { fontSize: 21, lineHeight: 30 },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  cardRow: { gap: 20 },
+  half: { flexBasis: 'calc(50% - 10px)', flexGrow: 1 },
+  full: { flexBasis: '100%' },
 
   /* Jackpots */
-  jackpotRow: { gap: 20 },
-  jackpotCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 28,
-    backgroundColor: '#10101C',
-    overflow: 'hidden',
-  },
-  jackpotTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 28 },
-  jackpotLogoChip: { backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  jackpotCard: { borderRadius: 28, padding: 28, backgroundColor: C.card },
+  jackpotTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 32 },
+  jackpotLogoChip: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   logoPowerball: { width: 120, height: 28 },
   logoMega: { width: 96, height: 36 },
-  nextDrawPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  nextDrawText: { color: C.text, fontSize: 12, fontWeight: '600' },
-  jackpotLabel: { color: C.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.8 },
-  jackpotAmountRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 6, minHeight: 84 },
-  jackpotDollar: { color: C.text, fontSize: 32, fontWeight: '700', marginBottom: 14, marginRight: 2 },
-  jackpotAmount: { color: C.text, fontSize: 76, lineHeight: 84, fontWeight: '700', letterSpacing: -2.5, fontVariant: ['tabular-nums'] },
-  jackpotUnit: { color: C.muted, fontSize: 22, fontWeight: '600', marginBottom: 16, marginLeft: 10 },
-  jackpotPending: { flex: 1, color: C.muted, fontSize: 22, lineHeight: 30, fontWeight: '600', letterSpacing: -0.3, paddingBottom: 12 },
-  jackpotRules: { color: C.muted, fontSize: 13, marginTop: 14 },
+  nextDrawText: { color: C.muted, fontSize: 14 },
+  jackpotLabel: { color: C.muted, fontSize: 15 },
+  jackpotAmountRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 4, minHeight: 76 },
+  jackpotDollar: { color: C.text, fontSize: 32, fontWeight: '600', marginBottom: 12, marginRight: 2 },
+  jackpotAmount: { color: C.text, fontSize: 68, lineHeight: 76, fontWeight: '700', letterSpacing: -2.2, fontVariant: ['tabular-nums'] },
+  jackpotUnit: { color: C.muted, fontSize: 24, fontWeight: '600', marginBottom: 13, marginLeft: 10 },
+  jackpotSkeleton: { width: 200, height: 52, borderRadius: 12, backgroundColor: C.cardHi, marginBottom: 12 },
+  jackpotPending: { flex: 1, color: C.muted, fontSize: 24, lineHeight: 30, fontWeight: '600', letterSpacing: -0.3, paddingBottom: 12 },
+  jackpotRules: { color: C.faint, fontSize: 14, marginTop: 16 },
 
-  /* Bento */
-  bento: { gap: 16 },
-  featureCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-    padding: 26,
-  },
-  span1: { flexBasis: 'calc(33.333% - 11px)' as any, flexGrow: 0 },
-  span2: { flexBasis: 'calc(66.666% - 6px)' as any, flexGrow: 0 },
-  span3: { flexBasis: '100%' as any },
-  half: { flexBasis: 'calc(50% - 8px)' as any },
-  full: { flexBasis: '100%' as any },
-  featureIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  featureBodyRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 28 },
+  /* Features */
+  bento: { gap: 20 },
+  featureCard: { borderRadius: 28, backgroundColor: C.card, padding: 28 },
+  span1: { flexBasis: 'calc(33.333% - 14px)', flexGrow: 0 },
+  span2: { flexBasis: 'calc(66.666% - 7px)', flexGrow: 0 },
+  span3: { flexBasis: '100%' },
+  featureIcon: { marginBottom: 20 },
+  featureBodyRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 32 },
   featureTextCol: { flex: 1 },
-  featureTitle: { color: C.text, fontSize: 19, fontWeight: '700', marginBottom: 8 },
-  featureDesc: { color: C.muted, fontSize: 15, lineHeight: 23 },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 120, marginTop: 20, minWidth: 260 },
-  chartCol: { flex: 1, alignItems: 'center', height: '100%' as any },
-  chartTrack: { flex: 1, width: '100%' as any, justifyContent: 'flex-end' },
-  chartBar: { width: '100%' as any, borderRadius: 6 },
-  chartLabel: { color: C.faint, fontSize: 11, marginTop: 6, fontVariant: ['tabular-nums'] },
+  featureTitle: { color: C.text, fontSize: 21, fontWeight: '600', letterSpacing: -0.3, marginBottom: 8 },
+  featureDesc: { color: C.muted, fontSize: 17, lineHeight: 25 },
+  chartWrap: { marginTop: 24, minWidth: 260 },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 120 },
+  chartCol: { flex: 1, alignItems: 'center', height: '100%' },
+  chartTrack: { flex: 1, width: '100%', justifyContent: 'flex-end' },
+  chartBar: { width: '100%', borderRadius: 6 },
+  chartLabel: { color: C.faint, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] },
+  chartLabelTop: { color: C.text, fontWeight: '600' },
+  chartCaption: { color: C.faint, fontSize: 12, marginTop: 10 },
 
   /* Steps */
-  steps: { gap: 28 },
-  stepsWide: { flexDirection: 'row', gap: 24 },
-  step: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.14)', paddingTop: 20 },
+  steps: { gap: 32 },
+  stepsWide: { flexDirection: 'row', gap: 28 },
+  step: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.sep, paddingTop: 20 },
   stepWide: { flex: 1 },
-  stepNum: { color: C.muted, fontSize: 56, lineHeight: 60, fontWeight: '700', letterSpacing: -2, marginBottom: 12 },
-  stepTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  stepDesc: { color: C.muted, fontSize: 15, lineHeight: 23 },
+  stepNum: { color: C.accent, fontSize: 15, fontWeight: '600', marginBottom: 10 },
+  stepTitle: { color: C.text, fontSize: 21, fontWeight: '600', letterSpacing: -0.3, marginBottom: 8 },
+  stepDesc: { color: C.muted, fontSize: 17, lineHeight: 25 },
 
   /* Pricing */
-  pricingRow: { gap: 20, alignItems: 'stretch' },
-  planHalf: { flexBasis: 'calc(50% - 10px)' as any, flexGrow: 1 },
-  planCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-    padding: 30,
-  },
-  planProOuter: { borderRadius: 25, padding: 1.5, backgroundColor: C.gold },
-  planPro: { backgroundColor: '#0C1222', borderWidth: 0, flex: 1, borderRadius: 24 },
-  planBadge: {
-    position: 'absolute',
-    top: 24,
-    right: 24,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: C.gold,
-  },
-  planBadgeText: { color: '#1A1300', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  planTier: { color: C.muted, fontSize: 14, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
-  planPriceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 14 },
-  planPrice: { color: C.text, fontSize: 52, lineHeight: 56, fontWeight: '700', letterSpacing: -1.5 },
-  planPer: { color: C.muted, fontSize: 15, marginBottom: 9 },
-  planNote: { color: C.muted, fontSize: 14, marginTop: 8 },
-  planList: { gap: 12, marginTop: 24, marginBottom: 28 },
-  planLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  planLineText: { color: C.text, fontSize: 15 },
-  planBtn: { marginTop: 'auto' as any, flexGrow: 0 },
-  planFine: { color: C.muted, fontSize: 13, textAlign: 'center', marginTop: 12 },
+  pricingRow: { alignItems: 'stretch', maxWidth: 880, alignSelf: 'center', width: '100%' },
+  planCard: { borderRadius: 28, backgroundColor: C.card, padding: 32, borderWidth: 1, borderColor: 'transparent' },
+  planPro: { borderColor: 'rgba(45,212,167,0.45)' },
+  planTierRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  planTier: { color: C.text, fontSize: 24, fontWeight: '600', letterSpacing: -0.3 },
+  planBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(45,212,167,0.14)' },
+  planBadgeText: { color: C.accent, fontSize: 13, fontWeight: '600' },
+  planPriceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 20 },
+  planPrice: { color: C.text, fontSize: 48, lineHeight: 52, fontWeight: '700', letterSpacing: -1.4, fontVariant: ['tabular-nums'] },
+  planPer: { color: C.muted, fontSize: 17, marginBottom: 8 },
+  planNote: { color: C.muted, fontSize: 15, marginTop: 8 },
+  planList: { gap: 14, marginTop: 28, marginBottom: 32 },
+  planLine: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  planLineText: { color: C.text, fontSize: 17 },
+  planBtn: { marginTop: 'auto', flexDirection: 'column', gap: 12 },
+  planFine: { color: C.faint, fontSize: 13, textAlign: 'center' },
 
   /* Final CTA */
-  finalCta: {
-    borderRadius: 32,
-    paddingHorizontal: 24,
-    paddingVertical: 56,
-    alignItems: 'center',
-    backgroundColor: C.tealDeep,
-    overflow: 'hidden',
-  },
-  finalCtaWide: { paddingVertical: 80 },
-  finalBalls: { flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 28 },
-  finalTitle: { color: '#FFFFFF', fontSize: 32, lineHeight: 38, fontWeight: '700', textAlign: 'center', letterSpacing: -1 },
-  finalTitleMid: { fontSize: 48, lineHeight: 54, letterSpacing: -1.6 },
-  finalSub: { color: 'rgba(255,255,255,0.85)', fontSize: 17, lineHeight: 26, textAlign: 'center', marginTop: 14, marginBottom: 30, maxWidth: 560 },
-  storeRow: { flexDirection: 'row', gap: 12, marginTop: 28, flexWrap: 'wrap', justifyContent: 'center' },
-  storeBadge: { opacity: 0.95 },
+  finalCta: { alignItems: 'center' },
+  finalBalls: { flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 32 },
+  finalTitle: { color: C.text, fontSize: 36, lineHeight: 42, fontWeight: '700', textAlign: 'center', letterSpacing: -0.8 },
+  finalTitleMid: { fontSize: 56, lineHeight: 62, letterSpacing: -1.4 },
+  finalSub: { color: C.muted, fontSize: 19, lineHeight: 27, textAlign: 'center', marginTop: 16, marginBottom: 32, maxWidth: 560 },
+  storeRow: { flexDirection: 'row', gap: 12, marginTop: 32, flexWrap: 'wrap', justifyContent: 'center' },
   storeImgApple: { width: 140, height: 46 },
   storeImgGoogle: { width: 156, height: 46 },
 
   /* Footer */
-  footer: { paddingTop: 48, paddingBottom: 56, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.ink },
-  footerDisclaimer: { color: C.faint, fontSize: 13, lineHeight: 20, marginTop: 20, marginBottom: 16, maxWidth: 820 },
-  footerText: { color: C.faint, fontSize: 12, marginTop: 4 },
+  footer: { paddingTop: 32, paddingBottom: 48, backgroundColor: C.bgAlt, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.sep },
+  footerDisclaimer: { color: C.faint, fontSize: 12, lineHeight: 18 },
+  footerRule: { height: StyleSheet.hairlineWidth, backgroundColor: C.sep, marginVertical: 16 },
+  footerBottom: { gap: 6 },
+  footerBottomRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
+  footerText: { color: C.faint, fontSize: 12 },
 });
