@@ -65,24 +65,41 @@ const POWERBALL_DRAW_DAYS = [1, 3, 6];
 /** Tue, Fri */
 const MEGA_DRAW_DAYS = [2, 5];
 
+/** Theme tokens resolve to CSS variables set per appearance in LANDING_CSS. */
 const C = {
-  bg: '#000000',
-  bgAlt: '#0A0A0C',
-  card: '#161618',
-  cardHi: '#232326',
-  sep: 'rgba(255,255,255,0.14)',
-  text: '#F5F5F7',
-  muted: '#A1A1A6',
-  faint: '#86868B',
-  /** Single brand accent for links, icons and highlights (11:1 on black). */
-  accent: '#2DD4A7',
-  /** Accent fill behind white labels (4.5:1). */
+  bg: 'var(--ld-bg)',
+  bgAlt: 'var(--ld-bg-alt)',
+  card: 'var(--ld-card)',
+  cardHi: 'var(--ld-card-hi)',
+  sep: 'var(--ld-sep)',
+  text: 'var(--ld-text)',
+  onText: 'var(--ld-on-text)',
+  muted: 'var(--ld-muted)',
+  faint: 'var(--ld-faint)',
+  /** Single brand accent for links, icons and highlights. */
+  accent: 'var(--ld-accent)',
+  /** Accent fill behind white labels (4.5:1 in both appearances). */
   accentFill: '#00866B',
-  chartBar: 'rgba(255,255,255,0.18)',
+  accentBorder: 'var(--ld-accent-border)',
+  tint: 'var(--ld-tint)',
+  fill: 'var(--ld-fill)',
+  track: 'var(--ld-track)',
+  chartBar: 'var(--ld-chart-bar)',
+  navBg: 'var(--ld-nav)',
+  scrim: 'var(--ld-scrim)',
+  logoChip: 'var(--ld-logo-chip)',
   /** Lottery-ball colors are content, not UI accents. */
   gold: '#FFC857',
   red: '#FF4D5E',
 };
+
+type Appearance = 'light' | 'dark';
+/** SVG strokes can't read CSS variables, so icons get concrete colors. */
+const ICON_HEX: Record<Appearance, { accent: string; text: string }> = {
+  dark: { accent: '#2DD4A7', text: '#F5F5F7' },
+  light: { accent: '#007A62', text: '#1D1D1F' },
+};
+const APPEARANCE_KEY = 'ld-appearance';
 
 /** SF Pro on Apple devices, platform UI font elsewhere. */
 const FONT_STACK =
@@ -130,20 +147,72 @@ function patternScore(whites: number[]): number {
   return Math.round(Math.max(55, 99 - sumPenalty - balancePenalty));
 }
 
-/** Inject the landing stylesheet once (web). */
+/** Inject the landing stylesheet once (web), before first paint so theme variables exist. */
 function useLandingStyles() {
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-    if (document.getElementById('ld-landing-css')) return;
+  useState(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return null;
+    if (document.getElementById('ld-landing-css')) return null;
     const el = document.createElement('style');
     el.id = 'ld-landing-css';
     el.textContent = LANDING_CSS;
     document.head.appendChild(el);
+    return null;
+  });
+}
+
+function storedAppearance(): Appearance | null {
+  try {
+    const v = typeof window !== 'undefined' ? window.localStorage.getItem(APPEARANCE_KEY) : null;
+    return v === 'light' || v === 'dark' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function systemAppearance(): Appearance {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+/**
+ * Follows the system appearance (HIG: avoid app-specific appearance settings)
+ * until the visitor picks one with the footer toggle; that choice is remembered.
+ */
+function useAppearance(): [Appearance, () => void] {
+  const [appearance, setAppearance] = useState<Appearance>(() => storedAppearance() ?? systemAppearance());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia?.('(prefers-color-scheme: light)');
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      if (!storedAppearance()) setAppearance(e.matches ? 'light' : 'dark');
+    };
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
   }, []);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.documentElement.style.colorScheme = appearance;
+  }, [appearance]);
+
+  const toggle = () => {
+    const next: Appearance = appearance === 'dark' ? 'light' : 'dark';
+    try {
+      window.localStorage.setItem(APPEARANCE_KEY, next);
+    } catch {
+      // Private mode or blocked storage: the toggle still works for this visit.
+    }
+    setAppearance(next);
+  };
+
+  return [appearance, toggle];
 }
 
 export function WebLandingPage({ onLogin, onRegister }: Props) {
   useLandingStyles();
+  const [appearance, toggleAppearance] = useAppearance();
+  const icon = ICON_HEX[appearance];
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isWide = width >= 900;
@@ -237,7 +306,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
   return (
     <ScrollView
       style={styles.root}
-      {...ld('root')}
+      {...(Platform.OS === 'web' ? ({ dataSet: { ld: 'root', theme: appearance } } as object) : {})}
       contentContainerStyle={styles.scroll}
       ref={scrollViewRef}
       stickyHeaderIndices={[0]}
@@ -246,7 +315,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       <View style={styles.navShell}>
         <View style={styles.navBand} {...ld('nav')}>
           <View style={[styles.container, styles.nav, { paddingHorizontal: gutter, paddingTop: insets.top }]}>
-            <LottoDreamLogo width={isMid ? 148 : 132} tone="onDark" />
+            <LottoDreamLogo width={isMid ? 148 : 132} tone={appearance === 'dark' ? 'onDark' : 'default'} />
             {isWide ? (
               <View style={styles.navLinks}>
                 {navLinks.map((l) => (
@@ -428,7 +497,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── Features ── */}
-      <View style={[styles.band, styles.bandAlt, bandPad]} {...trackSection('features')}>
+      <View style={[styles.band, styles.bandAlt, bandPad]} {...trackSection('features')} {...ld('band-alt')}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
           <SectionHead
             eyebrow="Features"
@@ -448,7 +517,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                 <View style={f.span > 1 && isWide ? styles.featureBodyRow : undefined}>
                   <View style={f.span > 1 && isWide ? styles.featureTextCol : undefined}>
                     <Svg width={30} height={30} viewBox={FEATURE_ICON_VIEWBOX} style={styles.featureIcon}>
-                      <Path d={f.svgPath} fill="none" stroke={C.accent} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+                      <Path d={f.svgPath} fill="none" stroke={icon.accent} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
                     <Text style={styles.featureTitle}>{f.title}</Text>
                     <Text style={styles.featureDesc}>{f.desc}</Text>
@@ -478,7 +547,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
       </View>
 
       {/* ── Pricing ── */}
-      <View style={[styles.band, styles.bandAlt, bandPad]} {...trackSection('pricing')}>
+      <View style={[styles.band, styles.bandAlt, bandPad]} {...trackSection('pricing')} {...ld('band-alt')}>
         <View style={[styles.container, { paddingHorizontal: gutter }]}>
           <SectionHead
             eyebrow="Pricing"
@@ -495,7 +564,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
               <Text style={styles.planNote}>Everything you need to explore.</Text>
               <View style={styles.planList}>
                 {['Pure Random picks', 'Live jackpots and draw results', 'Full draw history', 'Save up to 3 sets'].map((t) => (
-                  <PlanLine key={t} text={t} />
+                  <PlanLine key={t} text={t} color={icon.accent} />
                 ))}
               </View>
               <View style={styles.planBtn}>
@@ -526,7 +595,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                   'All 6 games, unlimited saves',
                   'Priority support',
                 ].map((t) => (
-                  <PlanLine key={t} text={t} />
+                  <PlanLine key={t} text={t} color={icon.accent} />
                 ))}
               </View>
               <View style={styles.planBtn}>
@@ -574,9 +643,12 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             responsibly. Must be 18+ (or the legal gambling age in your jurisdiction) to play.
           </Text>
           <View style={styles.footerRule} />
-          <View style={[styles.footerBottom, isMid && styles.footerBottomRow]}>
-            <Text style={styles.footerText}>© {new Date().getFullYear()} Lotto Dream. All rights reserved.</Text>
-            <Text style={styles.footerText}>Data from NY Open Data · Updated after every drawing</Text>
+          <View style={styles.footerBottom}>
+            <View style={[styles.footerMeta, isMid && styles.footerMetaRow]}>
+              <Text style={styles.footerText}>© {new Date().getFullYear()} Lotto Dream. All rights reserved.</Text>
+              <Text style={styles.footerText}>Data from NY Open Data · Updated after every drawing</Text>
+            </View>
+            <AppearanceToggle appearance={appearance} color={icon.text} onPress={toggleAppearance} />
           </View>
         </View>
       </View>
@@ -619,6 +691,35 @@ function Button({
         {label}
         {chevron ? ' ›' : ''}
       </Text>
+    </Pressable>
+  );
+}
+
+const SUN_PATH =
+  'M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21M5.64 5.64l1.06 1.06M17.3 17.3l1.06 1.06M5.64 18.36l1.06-1.06M17.3 6.7l1.06-1.06M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z';
+const MOON_PATH = 'M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z';
+
+/** Footer control that flips between light and dark appearance. */
+function AppearanceToggle({ appearance, color, onPress }: { appearance: Appearance; color: string; onPress: () => void }) {
+  const next = appearance === 'dark' ? 'light' : 'dark';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Switch to ${next} appearance`}
+      style={({ pressed }) => [styles.appearanceBtn, pressed && styles.pressed]}
+      {...ld('btn appearance')}
+    >
+      <Svg width={20} height={20} viewBox="0 0 24 24">
+        <Path
+          d={appearance === 'dark' ? SUN_PATH : MOON_PATH}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
     </Pressable>
   );
 }
@@ -756,10 +857,10 @@ function CheckIcon({ color, size = 16 }: { color: string; size?: number }) {
   );
 }
 
-function PlanLine({ text }: { text: string }) {
+function PlanLine({ text, color }: { text: string; color: string }) {
   return (
     <View style={styles.planLine}>
-      <CheckIcon color={C.accent} />
+      <CheckIcon color={color} />
       <Text style={styles.planLineText}>{text}</Text>
     </View>
   );
@@ -817,17 +918,39 @@ const STEPS = [
 /* ── Web-only stylesheet (hooks via data-ld) ── */
 
 const LANDING_CSS = `
+[data-ld~="root"] {
+  color-scheme: dark;
+  --ld-bg: #000000; --ld-bg-alt: #0A0A0C; --ld-card: #161618; --ld-card-hi: #232326;
+  --ld-sep: rgba(255,255,255,0.14); --ld-text: #F5F5F7; --ld-on-text: #000000;
+  --ld-muted: #A1A1A6; --ld-faint: #86868B;
+  --ld-accent: #2DD4A7; --ld-accent-border: rgba(45,212,167,0.45); --ld-tint: rgba(45,212,167,0.14);
+  --ld-fill: rgba(255,255,255,0.06); --ld-fill-hover: rgba(255,255,255,0.1); --ld-track: rgba(255,255,255,0.12);
+  --ld-chart-bar: rgba(255,255,255,0.18); --ld-nav: rgba(0,0,0,0.72); --ld-nav-solid: rgba(0,0,0,0.9);
+  --ld-scrim: rgba(0,0,0,0.6); --ld-logo-chip: #F5F5F7; --ld-ball-shadow: rgba(0,0,0,0.7);
+}
+[data-ld~="root"][data-theme="light"] {
+  color-scheme: light;
+  --ld-bg: #FFFFFF; --ld-bg-alt: #F5F5F7; --ld-card: #F5F5F7; --ld-card-hi: #FFFFFF;
+  --ld-sep: rgba(0,0,0,0.12); --ld-text: #1D1D1F; --ld-on-text: #FFFFFF;
+  --ld-muted: #6E6E73; --ld-faint: #6E6E73;
+  --ld-accent: #007A62; --ld-accent-border: rgba(0,122,98,0.4); --ld-tint: rgba(0,134,107,0.1);
+  --ld-fill: rgba(0,0,0,0.05); --ld-fill-hover: rgba(0,0,0,0.08); --ld-track: rgba(0,0,0,0.1);
+  --ld-chart-bar: rgba(0,0,0,0.12); --ld-nav: rgba(255,255,255,0.72); --ld-nav-solid: rgba(255,255,255,0.9);
+  --ld-scrim: rgba(0,0,0,0.25); --ld-logo-chip: #FFFFFF; --ld-ball-shadow: rgba(0,0,0,0.3);
+}
+[data-ld~="root"][data-theme="light"] [data-ld~="band-alt"] { --ld-card: #FFFFFF; --ld-card-hi: #F5F5F7; }
+[data-ld~="root"], [data-ld~="root"] [data-ld] { transition: background-color .3s ease, color .3s ease; }
 [data-ld~="root"], [data-ld~="root"] * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 [data-ld~="root"] div[dir] { font-family: inherit; }
 
-[data-ld~="nav"] { backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); background: rgba(0,0,0,0.72) !important; }
+[data-ld~="nav"] { backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); background: var(--ld-nav) !important; }
 [data-ld~="navlink"] { cursor: pointer; }
 [data-ld~="navlink"] > div { transition: color .2s ease; }
-[data-ld~="navlink"]:hover > div { color: #FFFFFF !important; }
+[data-ld~="navlink"]:hover > div { color: var(--ld-text) !important; }
 
-[data-ld~="ball-white"] { background: radial-gradient(circle at 35% 30%, #FFFFFF 0%, #F2F3F6 45%, #C9CDD6 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.12), 0 6px 14px -8px rgba(0,0,0,0.7); }
-[data-ld~="ball-red"] { background: radial-gradient(circle at 35% 30%, #FF8C97 0%, #FF4D5E 45%, #B3182E 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.2), 0 6px 14px -8px rgba(0,0,0,0.7); }
-[data-ld~="ball-gold"] { background: radial-gradient(circle at 35% 30%, #FFE7A8 0%, #FFC857 45%, #C08A22 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.18), 0 6px 14px -8px rgba(0,0,0,0.7); }
+[data-ld~="ball-white"] { background: radial-gradient(circle at 35% 30%, #FFFFFF 0%, #F2F3F6 45%, #C9CDD6 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.12), 0 6px 14px -8px var(--ld-ball-shadow); }
+[data-ld~="ball-red"] { background: radial-gradient(circle at 35% 30%, #FF8C97 0%, #FF4D5E 45%, #B3182E 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.2), 0 6px 14px -8px var(--ld-ball-shadow); }
+[data-ld~="ball-gold"] { background: radial-gradient(circle at 35% 30%, #FFE7A8 0%, #FFC857 45%, #C08A22 100%) !important; box-shadow: inset -3px -4px 10px rgba(0,0,0,0.18), 0 6px 14px -8px var(--ld-ball-shadow); }
 [data-ld~="pop"] { animation: ld-pop .35s cubic-bezier(.25,.1,.25,1) both; }
 @keyframes ld-pop { from { transform: scale(.88); opacity: 0; } to { transform: none; opacity: 1; } }
 
@@ -838,9 +961,10 @@ const LANDING_CSS = `
 [data-ld~="btn"], [data-ld~="segment"] { cursor: pointer; transition: background-color .2s ease, filter .2s ease, transform .1s ease; }
 [data-ld~="btn-primary"]:hover { filter: brightness(1.12); }
 [data-ld~="btn-secondary"]:hover, [data-ld~="btn-tinted"]:hover { filter: brightness(1.25); }
+[data-theme="light"] [data-ld~="btn-secondary"]:hover, [data-theme="light"] [data-ld~="btn-tinted"]:hover { filter: brightness(0.96); }
 [data-ld~="btn-link"]:hover > div { text-decoration: underline; }
-[data-ld~="segment"]:hover { background-color: rgba(255,255,255,0.08); }
-[data-ld~="btn"]:focus-visible, [data-ld~="segment"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid #2DD4A7; outline-offset: 3px; }
+[data-ld~="segment"]:hover, [data-ld~="appearance"]:hover { background-color: var(--ld-fill-hover); }
+[data-ld~="btn"]:focus-visible, [data-ld~="segment"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid var(--ld-accent); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   [data-ld] { animation: none !important; transition: none !important; }
@@ -857,14 +981,14 @@ const styles = StyleSheet.create<any>({
 
   /* Nav */
   navShell: { position: 'relative', zIndex: 30 },
-  navBand: { backgroundColor: 'rgba(0,0,0,0.9)', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep },
+  navBand: { backgroundColor: 'var(--ld-nav-solid)', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 },
   navLinks: { flexDirection: 'row', alignItems: 'center', gap: 28 },
   navLink: { color: C.muted, fontSize: 14, paddingVertical: 10 },
   hamburger: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', gap: 5, marginRight: -10 },
   hamburgerBar: { width: 18, height: 1.5, borderRadius: 1, backgroundColor: C.text },
   mobileOverlay: { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 40 },
-  mobileBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
+  mobileBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: C.scrim },
   mobileDrawer: { backgroundColor: C.bgAlt, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep, paddingTop: 4, paddingBottom: 20 },
   mobileDrawerItem: { minHeight: 52, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.sep },
   mobileDrawerText: { color: C.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.3 },
@@ -878,7 +1002,7 @@ const styles = StyleSheet.create<any>({
   btn_lg: { minHeight: 50, paddingHorizontal: 28 },
   btn_primary: { backgroundColor: C.accentFill },
   btn_secondary: { backgroundColor: C.cardHi },
-  btn_tinted: { backgroundColor: 'rgba(45,212,167,0.14)' },
+  btn_tinted: { backgroundColor: C.tint },
   btn_link: { paddingHorizontal: 8 },
   btnText: { fontWeight: '600', textAlign: 'center' },
   btnText_sm: { fontSize: 14 },
@@ -919,13 +1043,13 @@ const styles = StyleSheet.create<any>({
   pickStatDivider: { width: StyleSheet.hairlineWidth, backgroundColor: C.sep },
   pickStatLabel: { color: C.muted, fontSize: 13 },
   pickStatValue: { color: C.text, fontSize: 24, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 4, letterSpacing: -0.4 },
-  meterTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginTop: 10 },
+  meterTrack: { height: 4, borderRadius: 2, backgroundColor: C.track, overflow: 'hidden', marginTop: 10 },
   meterFill: { height: 4, borderRadius: 2, backgroundColor: C.accent },
   segmented: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 20 },
-  segment: { paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
+  segment: { paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', backgroundColor: C.fill },
   segmentSelected: { backgroundColor: C.text },
   segmentText: { color: C.muted, fontSize: 14, fontWeight: '500' },
-  segmentTextSelected: { color: '#000000', fontWeight: '600' },
+  segmentTextSelected: { color: C.onText, fontWeight: '600' },
   pickFoot: { color: C.faint, fontSize: 13, lineHeight: 19, marginTop: 20 },
 
   /* Sections */
@@ -947,7 +1071,7 @@ const styles = StyleSheet.create<any>({
   /* Jackpots */
   jackpotCard: { borderRadius: 28, padding: 28, backgroundColor: C.card },
   jackpotTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 32 },
-  jackpotLogoChip: { backgroundColor: '#F5F5F7', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  jackpotLogoChip: { backgroundColor: C.logoChip, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   logoPowerball: { width: 120, height: 28 },
   logoMega: { width: 96, height: 36 },
   nextDrawText: { color: C.muted, fontSize: 14 },
@@ -992,10 +1116,10 @@ const styles = StyleSheet.create<any>({
   /* Pricing */
   pricingRow: { alignItems: 'stretch', maxWidth: 880, alignSelf: 'center', width: '100%' },
   planCard: { borderRadius: 28, backgroundColor: C.card, padding: 32, borderWidth: 1, borderColor: 'transparent' },
-  planPro: { borderColor: 'rgba(45,212,167,0.45)' },
+  planPro: { borderColor: C.accentBorder },
   planTierRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   planTier: { color: C.text, fontSize: 24, fontWeight: '600', letterSpacing: -0.3 },
-  planBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(45,212,167,0.14)' },
+  planBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: C.tint },
   planBadgeText: { color: C.accent, fontSize: 13, fontWeight: '600' },
   planPriceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 20 },
   planPrice: { color: C.text, fontSize: 48, lineHeight: 52, fontWeight: '700', letterSpacing: -1.4, fontVariant: ['tabular-nums'] },
@@ -1021,7 +1145,9 @@ const styles = StyleSheet.create<any>({
   footer: { paddingTop: 32, paddingBottom: 48, backgroundColor: C.bgAlt, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.sep },
   footerDisclaimer: { color: C.faint, fontSize: 12, lineHeight: 18 },
   footerRule: { height: StyleSheet.hairlineWidth, backgroundColor: C.sep, marginVertical: 16 },
-  footerBottom: { gap: 6 },
-  footerBottomRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
+  footerBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  footerMeta: { flex: 1, gap: 6 },
+  footerMetaRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 24 },
+  appearanceBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: C.fill, marginRight: -4 },
   footerText: { color: C.faint, fontSize: 12 },
 });
