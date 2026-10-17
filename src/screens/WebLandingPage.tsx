@@ -73,13 +73,17 @@ const C = {
   border: 'rgba(255,255,255,0.09)',
   text: '#F4F6FB',
   muted: '#9AA4B8',
-  faint: '#667085',
+  faint: '#8A94A8',
   teal: '#1FD3A8',
   tealDeep: '#00A383',
   gold: '#FFC857',
   red: '#FF4D5E',
   blue: '#4C8DFF',
 };
+
+/** SF Pro on Apple devices, platform UI font elsewhere. */
+const FONT_STACK =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, sans-serif';
 
 const PICK_MODES = ['Balanced', 'Hot', 'Cold', 'Anti-Crowd', 'Lucky Dates'] as const;
 const PICK_CYCLE_MS = 3200;
@@ -236,6 +240,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
   return (
     <ScrollView
       style={styles.root}
+      {...ld('root')}
       contentContainerStyle={styles.scroll}
       ref={scrollViewRef}
       stickyHeaderIndices={[0]}
@@ -248,7 +253,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             {isWide ? (
               <View style={styles.navLinks}>
                 {navLinks.map((l) => (
-                  <Pressable key={l.key} onPress={() => scrollToSection(l.key)} {...ld('navlink')}>
+                  <Pressable key={l.key} onPress={() => scrollToSection(l.key)} accessibilityRole="link" {...ld('navlink')}>
                     <Text style={styles.navLink}>{l.label}</Text>
                   </Pressable>
                 ))}
@@ -256,7 +261,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                   <Text style={styles.navGhostText}>Sign in</Text>
                 </Pressable>
                 <Pressable onPress={onRegister} style={styles.navPrimary} {...ld('btn-primary')}>
-                  <Text style={styles.navPrimaryText}>Start free</Text>
+                  <Text style={styles.navPrimaryText}>Start free trial</Text>
                 </Pressable>
               </View>
             ) : (
@@ -266,6 +271,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel={menuOpen ? 'Close menu' : 'Open menu'}
+                accessibilityState={{ expanded: menuOpen }}
               >
                 <View style={[styles.hamburgerBar, menuOpen && { transform: [{ translateY: 6 }, { rotate: '45deg' }] }]} />
                 <View style={[styles.hamburgerBar, menuOpen && { opacity: 0 }]} />
@@ -279,7 +285,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
             <Pressable style={[styles.mobileBackdrop, { height }]} onPress={() => setMenuOpen(false)} />
             <View style={styles.mobileDrawer}>
               {navLinks.map((l) => (
-                <Pressable key={l.key} style={styles.mobileDrawerItem} onPress={() => scrollToSection(l.key)}>
+                <Pressable key={l.key} style={styles.mobileDrawerItem} onPress={() => scrollToSection(l.key)} accessibilityRole="link">
                   <Text style={styles.mobileDrawerText}>{l.label}</Text>
                 </Pressable>
               ))}
@@ -436,7 +442,7 @@ export function WebLandingPage({ onLogin, onRegister }: Props) {
                 landingJackpots.megamillions?.nextDrawDate ??
                 nextScheduledDrawOnOrAfter(new Date(), MEGA_DRAW_DAYS)
               }
-              rules="5 of 1–70 + Mega Ball 1–25 · Tue, Fri"
+              rules="5 of 1–70 + Mega Ball 1–24 · Tue, Fri"
               wide={isMid}
             />
           </View>
@@ -683,7 +689,7 @@ function JackpotCard({
   rules: string;
   wide: boolean;
 }) {
-  const [num, unit] = amount ? amount.replace('$', '').split(/\s+/, 2) : ['—', ''];
+  const [num, unit] = amount ? amount.replace('$', '').split(/\s+/, 2) : ['', ''];
   return (
     <View
       style={[styles.jackpotCard, wide && styles.planHalf, { borderColor: kind === 'powerball' ? 'rgba(255,77,94,0.35)' : 'rgba(255,200,87,0.35)' }]}
@@ -699,11 +705,17 @@ function JackpotCard({
       </View>
       <Text style={styles.jackpotLabel}>ESTIMATED JACKPOT</Text>
       <View style={styles.jackpotAmountRow}>
-        {amount ? <Text style={styles.jackpotDollar}>$</Text> : null}
-        <Text style={styles.jackpotAmount} {...ld(kind === 'powerball' ? 'amount-red' : 'amount-gold')}>
-          {num}
-        </Text>
-        {unit ? <Text style={styles.jackpotUnit}>{unit}</Text> : null}
+        {amount ? (
+          <>
+            <Text style={styles.jackpotDollar}>$</Text>
+            <Text style={styles.jackpotAmount} {...ld(kind === 'powerball' ? 'amount-red' : 'amount-gold')}>
+              {num}
+            </Text>
+            {unit ? <Text style={styles.jackpotUnit}>{unit}</Text> : null}
+          </>
+        ) : (
+          <Text style={styles.jackpotPending}>Updating after the next draw</Text>
+        )}
       </View>
       <Text style={styles.jackpotRules}>{rules}</Text>
     </View>
@@ -839,38 +851,40 @@ const LANDING_CSS = `
 [data-ld~="ball-white"] { background: radial-gradient(circle at 32% 28%, #FFFFFF 0%, #EEF1F7 38%, #B7C0D1 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.18), 0 10px 20px -8px rgba(0,0,0,0.6); }
 [data-ld~="ball-red"] { background: radial-gradient(circle at 32% 28%, #FFB3BB 0%, #FF4D5E 42%, #9E1026 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.25), 0 10px 24px -6px rgba(255,77,94,0.55); }
 [data-ld~="ball-gold"] { background: radial-gradient(circle at 32% 28%, #FFF1C7 0%, #FFC857 45%, #B7791F 100%) !important; box-shadow: inset -4px -6px 12px rgba(0,0,0,0.2), 0 10px 24px -6px rgba(255,200,87,0.5); }
-[data-ld~="pop"] { animation: ld-pop .55s cubic-bezier(.2,1.4,.4,1) both; }
-@keyframes ld-pop { from { transform: translateY(-18px) scale(.4) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+[data-ld~="pop"] { animation: ld-pop .45s cubic-bezier(.25,.1,.25,1) both; }
+@keyframes ld-pop { from { transform: translateY(-8px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
 [data-ld~="float-0"], [data-ld~="float-1"], [data-ld~="float-2"] { animation: ld-float 5s ease-in-out infinite; }
 [data-ld~="float-1"] { animation-delay: -1.6s; animation-duration: 6s; }
 [data-ld~="float-2"] { animation-delay: -3.1s; animation-duration: 5.5s; }
-@keyframes ld-float { 50% { transform: translateY(-10px) rotate(8deg); } }
+@keyframes ld-float { 50% { transform: translateY(-6px); } }
 
 [data-ld~="card"], [data-ld~="jackpot-powerball"], [data-ld~="jackpot-mega"] { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
-[data-ld~="card"]:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.18) !important; box-shadow: 0 24px 50px -24px rgba(0,0,0,0.8); }
+[data-ld~="card"]:hover { border-color: rgba(255,255,255,0.16) !important; }
 [data-ld~="jackpot-powerball"] { background: radial-gradient(600px 300px at 0% 0%, rgba(255,77,94,0.28), transparent 60%), linear-gradient(160deg, #1A0B12, #0B0B16) !important; }
 [data-ld~="jackpot-mega"] { background: radial-gradient(600px 300px at 0% 0%, rgba(255,200,87,0.22), transparent 60%), linear-gradient(160deg, #0B1530, #0B0B16) !important; }
-[data-ld~="jackpot-powerball"]:hover, [data-ld~="jackpot-mega"]:hover { transform: translateY(-4px); }
 [data-ld~="icon-0"], [data-ld~="icon-1"], [data-ld~="icon-2"] { box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 20px -8px rgba(0,0,0,0.6); }
 [data-ld~="bar"] { transform-origin: bottom; animation: ld-grow .9s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes ld-grow { from { transform: scaleY(0); } }
 
-[data-ld~="pro-border"] { background: linear-gradient(140deg, #FFC857, #1FD3A8 50%, #7C5CFF) !important; box-shadow: 0 30px 80px -30px rgba(255,200,87,0.35); }
+[data-ld~="pro-border"] { background: linear-gradient(160deg, rgba(255,200,87,0.9), rgba(255,200,87,0.25)) !important; box-shadow: 0 30px 80px -40px rgba(255,200,87,0.3); }
 [data-ld~="badge"] { background: linear-gradient(90deg, #FFC857, #FF9F5A) !important; }
 
 [data-ld~="btn-primary"] { background: linear-gradient(180deg, #2BE3B6, #00A383) !important; box-shadow: 0 10px 30px -10px rgba(31,211,168,0.7), inset 0 1px 0 rgba(255,255,255,0.35); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; cursor: pointer; }
-[data-ld~="btn-primary"]:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 16px 40px -12px rgba(31,211,168,0.85), inset 0 1px 0 rgba(255,255,255,0.35); }
+[data-ld~="btn-primary"]:hover { filter: brightness(1.06); box-shadow: 0 16px 40px -12px rgba(31,211,168,0.85), inset 0 1px 0 rgba(255,255,255,0.35); }
 [data-ld~="btn-ghost"] { transition: background-color .15s ease, border-color .15s ease; cursor: pointer; }
 [data-ld~="btn-ghost"]:hover { background-color: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.3) !important; }
 [data-ld~="btn-dark"] { transition: transform .15s ease; cursor: pointer; }
-[data-ld~="btn-dark"]:hover { transform: translateY(-1px); }
+[data-ld~="btn-dark"]:hover { filter: brightness(1.25); }
+[data-ld~="btn-primary"]:active, [data-ld~="btn-ghost"]:active, [data-ld~="btn-dark"]:active { transform: scale(.97); }
 
 [data-ld~="final-cta"] { background:
   radial-gradient(700px 400px at 100% 0%, rgba(255,200,87,0.55), transparent 60%),
   radial-gradient(700px 400px at 0% 100%, rgba(124,92,255,0.45), transparent 60%),
   linear-gradient(135deg, #00A383, #0E7A67) !important; }
 
-[data-ld~="btn-primary"]:focus-visible, [data-ld~="btn-ghost"]:focus-visible, [data-ld~="btn-dark"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid #FFC857; outline-offset: 3px; }
+[data-ld~="btn-primary"]:focus-visible, [data-ld~="btn-ghost"]:focus-visible, [data-ld~="btn-dark"]:focus-visible, [data-ld~="navlink"]:focus-visible { outline: 2px solid #4C8DFF; outline-offset: 3px; }
+[data-ld~="root"], [data-ld~="root"] * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+[data-ld~="root"] div[dir] { font-family: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   [data-ld] { animation: none !important; transition: none !important; }
@@ -880,7 +894,7 @@ const LANDING_CSS = `
 /* ── Styles ── */
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.ink },
+  root: { flex: 1, backgroundColor: C.ink, fontFamily: FONT_STACK } as any,
   scroll: { minHeight: '100%' as any, backgroundColor: C.ink },
   container: { width: '100%' as any, maxWidth: 1200, alignSelf: 'center' },
 
@@ -897,21 +911,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 14,
   },
-  navLinks: { flexDirection: 'row', alignItems: 'center', gap: 28 },
-  navLink: { color: C.muted, fontSize: 14, fontWeight: '500' },
+  navLinks: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  navLink: { color: C.muted, fontSize: 14, fontWeight: '500', paddingVertical: 12 },
   navGhost: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
   },
   navGhostText: { color: C.text, fontSize: 14, fontWeight: '600' },
-  navPrimary: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: C.tealDeep, marginLeft: -16 },
+  navPrimary: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 999, backgroundColor: C.tealDeep, marginLeft: -16 },
   navPrimaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 
-  hamburger: { width: 28, height: 20, justifyContent: 'space-between', paddingVertical: 1 },
-  hamburgerBar: { height: 2, borderRadius: 2, backgroundColor: C.text },
+  hamburger: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', gap: 4, marginRight: -8 },
+  hamburgerBar: { width: 22, height: 2, borderRadius: 2, backgroundColor: C.text },
   mobileOverlay: { position: 'absolute', top: '100%' as any, left: 0, right: 0, zIndex: 40 },
   mobileBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
   mobileDrawer: {
@@ -931,6 +946,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 22,
     paddingVertical: 13,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
@@ -968,7 +984,7 @@ const styles = StyleSheet.create({
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.teal },
   livePillText: { color: '#CFF7EC', fontSize: 13, fontWeight: '500' },
   livePillStrong: { color: '#FFFFFF', fontWeight: '800' },
-  heroTitle: { color: C.text, fontSize: 42, lineHeight: 46, fontWeight: '800', letterSpacing: -1.2 },
+  heroTitle: { color: C.text, fontSize: 42, lineHeight: 46, fontWeight: '700', letterSpacing: -1.2 },
   heroTitleMid: { fontSize: 58, lineHeight: 62, letterSpacing: -1.8 },
   heroTitleWide: { fontSize: 64, lineHeight: 68, letterSpacing: -2.2 },
   heroTitleAccent: { color: C.teal },
@@ -1033,14 +1049,14 @@ const styles = StyleSheet.create({
   modeChipActive: { backgroundColor: 'rgba(31,211,168,0.14)', borderColor: 'rgba(31,211,168,0.55)' },
   modeChipText: { color: C.faint, fontSize: 12, fontWeight: '600' },
   modeChipTextActive: { color: C.teal },
-  pickFoot: { color: C.faint, fontSize: 12, marginTop: 18, lineHeight: 18 },
+  pickFoot: { color: C.muted, fontSize: 13, marginTop: 18, lineHeight: 19 },
 
   /* Sections */
   band: { paddingVertical: 80, backgroundColor: C.ink },
   bandAlt: { backgroundColor: C.ink2, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.border },
   sectionHead: { marginBottom: 40, maxWidth: 720 },
-  eyebrow: { color: C.teal, fontSize: 12, fontWeight: '700', letterSpacing: 2.4, marginBottom: 12 },
-  sectionTitle: { color: C.text, fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8 },
+  eyebrow: { color: C.teal, fontSize: 13, fontWeight: '600', letterSpacing: 1.2, marginBottom: 12 },
+  sectionTitle: { color: C.text, fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -0.6 },
   sectionTitleMid: { fontSize: 42, lineHeight: 48, letterSpacing: -1.2 },
   sectionSub: { color: C.muted, fontSize: 17, lineHeight: 26, marginTop: 14 },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -1068,10 +1084,11 @@ const styles = StyleSheet.create({
   },
   nextDrawText: { color: C.text, fontSize: 12, fontWeight: '600' },
   jackpotLabel: { color: C.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.8 },
-  jackpotAmountRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 6 },
+  jackpotAmountRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 6, minHeight: 84 },
   jackpotDollar: { color: C.text, fontSize: 32, fontWeight: '700', marginBottom: 14, marginRight: 2 },
-  jackpotAmount: { color: C.text, fontSize: 76, lineHeight: 84, fontWeight: '800', letterSpacing: -3, fontVariant: ['tabular-nums'] },
+  jackpotAmount: { color: C.text, fontSize: 76, lineHeight: 84, fontWeight: '700', letterSpacing: -2.5, fontVariant: ['tabular-nums'] },
   jackpotUnit: { color: C.muted, fontSize: 22, fontWeight: '600', marginBottom: 16, marginLeft: 10 },
+  jackpotPending: { flex: 1, color: C.muted, fontSize: 22, lineHeight: 30, fontWeight: '600', letterSpacing: -0.3, paddingBottom: 12 },
   jackpotRules: { color: C.muted, fontSize: 13, marginTop: 14 },
 
   /* Bento */
@@ -1104,7 +1121,7 @@ const styles = StyleSheet.create({
   stepsWide: { flexDirection: 'row', gap: 24 },
   step: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.14)', paddingTop: 20 },
   stepWide: { flex: 1 },
-  stepNum: { color: C.muted, fontSize: 56, lineHeight: 60, fontWeight: '800', letterSpacing: -2, marginBottom: 12 },
+  stepNum: { color: C.muted, fontSize: 56, lineHeight: 60, fontWeight: '700', letterSpacing: -2, marginBottom: 12 },
   stepTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 8 },
   stepDesc: { color: C.muted, fontSize: 15, lineHeight: 23 },
 
@@ -1132,14 +1149,14 @@ const styles = StyleSheet.create({
   planBadgeText: { color: '#1A1300', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   planTier: { color: C.muted, fontSize: 14, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
   planPriceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 14 },
-  planPrice: { color: C.text, fontSize: 52, lineHeight: 56, fontWeight: '800', letterSpacing: -1.5 },
+  planPrice: { color: C.text, fontSize: 52, lineHeight: 56, fontWeight: '700', letterSpacing: -1.5 },
   planPer: { color: C.muted, fontSize: 15, marginBottom: 9 },
   planNote: { color: C.muted, fontSize: 14, marginTop: 8 },
   planList: { gap: 12, marginTop: 24, marginBottom: 28 },
   planLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   planLineText: { color: C.text, fontSize: 15 },
   planBtn: { marginTop: 'auto' as any, flexGrow: 0 },
-  planFine: { color: C.faint, fontSize: 12, textAlign: 'center', marginTop: 12 },
+  planFine: { color: C.muted, fontSize: 13, textAlign: 'center', marginTop: 12 },
 
   /* Final CTA */
   finalCta: {
@@ -1152,7 +1169,7 @@ const styles = StyleSheet.create({
   },
   finalCtaWide: { paddingVertical: 80 },
   finalBalls: { flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 28 },
-  finalTitle: { color: '#FFFFFF', fontSize: 32, lineHeight: 38, fontWeight: '800', textAlign: 'center', letterSpacing: -1 },
+  finalTitle: { color: '#FFFFFF', fontSize: 32, lineHeight: 38, fontWeight: '700', textAlign: 'center', letterSpacing: -1 },
   finalTitleMid: { fontSize: 48, lineHeight: 54, letterSpacing: -1.6 },
   finalSub: { color: 'rgba(255,255,255,0.85)', fontSize: 17, lineHeight: 26, textAlign: 'center', marginTop: 14, marginBottom: 30, maxWidth: 560 },
   storeRow: { flexDirection: 'row', gap: 12, marginTop: 28, flexWrap: 'wrap', justifyContent: 'center' },
