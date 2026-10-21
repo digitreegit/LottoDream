@@ -226,7 +226,9 @@ function parseOfficialRow(
     whiteParts.length === config.mainCount &&
     whiteParts.every((n) => n >= 1 && n <= config.mainMax) &&
     new Set(whiteParts).size === config.mainCount;
-  const hasValidBonus = !config.hasBonus || (Number.isFinite(bonus) && bonus >= 1 && bonus <= config.bonusMax);
+  // Past draws may use a larger bonus range than the current matrix (e.g. Mega Ball 25).
+  const bonusLimit = config.bonusHistoricalMax ?? config.bonusMax;
+  const hasValidBonus = !config.hasBonus || (Number.isFinite(bonus) && bonus >= 1 && bonus <= bonusLimit);
 
   if (!hasValidWhites || !hasValidBonus) {
     if (!hasValidWhites) return { draw: null, reason: 'invalid_white_range_or_duplicate' };

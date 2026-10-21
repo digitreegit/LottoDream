@@ -32,6 +32,8 @@ export interface GameConfig {
   mainMax: number;           // max value of a main number
   hasBonus: boolean;         // whether the game has a bonus ball
   bonusMax: number;          // max value of the bonus ball (0 when none)
+  /** Highest bonus value found in past draws, when the game's matrix has shrunk (defaults to bonusMax). */
+  bonusHistoricalMax?: number;
   drawsPerDay: number;       // 1 for most, 2 for Take 5 (midday/evening)
   reliability: GameDataReliability;
   storage: GameStorageShape; // legacy5 = n1..n5 columns, array = numbers[] column

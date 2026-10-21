@@ -98,7 +98,10 @@ export const GAME_CONFIGS: Record<GameType, GameConfig> = {
     mainCount: 5,
     mainMax: 70,
     hasBonus: true,
-    bonusMax: 25,
+    // Matrix change for drawings from April 8, 2025: Mega Ball 1–24 ($5 play).
+    // Earlier draws (Oct 2017 – Apr 2025) used 1–25, so history can still contain 25.
+    bonusMax: 24,
+    bonusHistoricalMax: 25,
     drawsPerDay: 1,
     reliability: 'stable',
     storage: 'legacy5',
